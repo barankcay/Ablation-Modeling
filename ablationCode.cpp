@@ -323,7 +323,7 @@ int main()
                 continue;
             }
             for (int i = 0; i < N_nodes; i++) {
-                double T_i = max(T_old[i], 1.0);
+                double T_i = T_old[i];
                 double I   = B_arr[c] * exp(-E_over_R[c] / T_i) * dt;
                 double a_i = alpha_old[c][i];
                 double a_new;
@@ -332,22 +332,18 @@ int main()
                 } else {
                     double exp_ = 1.0 / (1.0 - Psi_arr[c]);
                     double bkt  = I*(Psi_arr[c]-1.0)
-                                + pow(max(1.0-a_i, 1e-30), 1.0-Psi_arr[c]);
-                    bkt   = max(bkt, 1e-30);
+                                + pow(1.0-a_i, 1.0-Psi_arr[c]);
+                    
                     a_new = 1.0 - pow(bkt, exp_);
                 }
-                alpha_new[c][i] = max(0.0, min(1.0, a_new));
+                alpha_new[c][i] = a_new;
             }
         }
 
         // rho solid
         vector<double> rho_solid_new(N_nodes);
         for (int i = 0; i < N_nodes; i++) {
-            double r = 0.0;
-            for (int c = 0; c < N_comp; c++)
-                r += (c < 2 ? Gamma : (1-Gamma))
-                   * (rho_v_comp[c] - (rho_v_comp[c]-rho_c_comp[c])*alpha_new[c][i]);
-            // Düzeltme: Gamma sadece c=0,1 için, (1-Gamma) c=2 için
+
             rho_solid_new[i] = Gamma*(
                 (rho_v_comp[0]-(rho_v_comp[0]-rho_c_comp[0])*alpha_new[0][i])
                +(rho_v_comp[1]-(rho_v_comp[1]-rho_c_comp[1])*alpha_new[1][i])
@@ -359,8 +355,8 @@ int main()
         // alpha_eff, drho_dt, k_node
         vector<double> alpha_eff(N_nodes), drho_dt(N_nodes, 0.0), k_node(N_nodes);
         for (int i = 0; i < N_nodes; i++) {
-            alpha_eff[i] = max(0.0, min(1.0,
-                (rho_virgin - rho_solid_new[i]) / (rho_virgin - rho_char_total)));
+            alpha_eff[i] = 
+                (rho_virgin - rho_solid_new[i]) / (rho_virgin - rho_char_total);
             for (int c = 0; c < N_comp; c++)
                 drho_dt[i] += (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
@@ -385,7 +381,7 @@ int main()
         for (int i = 1; i < N_nodes-1; i++) {
             double dxl  = x[i]   - x[i-1];
             double dxr  = x[i+1] - x[i];
-            double dx_i = 0.5*(dxl+dxr);
+            double dx_i = 0.5*(dxl+dxr); //cell length
 
             double phi_i  = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
             double C_cap  = phi_i / (R_univ * T_old[i]);
@@ -395,12 +391,12 @@ int main()
             double a_east = K / dxr;
             double a_west = K / dxl;
 
-            double alpha_eff_old_i = max(0.0, min(1.0,
-                (rho_virgin-rho_solid_old[i])/(rho_virgin-rho_char_total)));
+            double alpha_eff_old_i = 
+                (rho_virgin-rho_solid_old[i])/(rho_virgin-rho_char_total);
             double dalpha_eff_dt_i = (alpha_eff[i]-alpha_eff_old_i) / dt;
 
             double S_P_temp = phi_i/(R_univ*T_old[i]*T_old[i]) * dT_dt[i];
-            double S_P_poro = -(phi_v-phi_c)/(R_univ*T_old[i]) * dalpha_eff_dt_i;
+            double S_P_poro = (phi_v-phi_c)/(R_univ*T_old[i]) * dalpha_eff_dt_i;
             double S_linear = S_P_temp + S_P_poro;
 
             a_P[i] = a_time + a_east + a_west - S_linear*dx_i;
@@ -410,7 +406,6 @@ int main()
         }
 
         vector<double> P_new = thomas_patankar(a_P, b_P, c_P, d_P);
-        for (auto& p : P_new) p = max(p, 1.0);
 
         // =====================================================================
         // 4. BLOWING
@@ -427,43 +422,59 @@ int main()
         k_surf  = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
         double T1 = T_old[1];
 
-        if (!ablation_active) {
+        if (!ablation_active)
+        {
             double Tw_stat = solve_Twall_NR(
                 h_eff, m_dot_g, k_surf, T1, T_wall,
                 T_recovery, emissivity, sigma_SB, T_surr, dx_surf, cp_g);
-            if (!isfinite(Tw_stat) || Tw_stat < 100.0) Tw_stat = T_wall;
 
-            if (Tw_stat >= T_ablation) {
+            if (Tw_stat >= T_ablation)
+            {
                 double sdot_try = compute_sdot(
                     h_eff, m_dot_g, k_surf, T1, T_ablation,
                     emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                     rho_char_total, Delta_H_melt, T_recovery);
-                ablation_active = sdot_try > 0.0;
+
                 T_wall = T_ablation;
-                s_dot  = ablation_active ? sdot_try : 0.0;
-            } else {
+
+                if (sdot_try > 0.0)
+                {
+                    ablation_active = true;
+                    s_dot = sdot_try;
+                }
+                else
+                {
+                    s_dot = 0.0;
+                }
+            }
+            else
+            {
                 T_wall = Tw_stat;
                 s_dot  = 0.0;
             }
-        } else {
+        }
+        else
+        {
             double sdot_try = compute_sdot(
                 h_eff, m_dot_g, k_surf, T1, T_ablation,
                 emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                 rho_char_total, Delta_H_melt, T_recovery);
-            if (sdot_try > 0.0) {
+
+            if (sdot_try > 0.0)
+            {
                 T_wall = T_ablation;
                 s_dot  = sdot_try;
-            } else {
+            }
+            else
+            {
                 ablation_active = false;
-                double Tw_stat = solve_Twall_NR(
-                    h_eff, m_dot_g, k_surf, T1, T_ablation-1.0,
+                double Tw_stat  = solve_Twall_NR(
+                    h_eff, m_dot_g, k_surf, T1, T_ablation - 1.0,
                     T_recovery, emissivity, sigma_SB, T_surr, dx_surf, cp_g);
-                T_wall = min(isfinite(Tw_stat) ? Tw_stat : T_ablation-1.0,
-                             T_ablation);
-                s_dot = 0.0;
+                T_wall = Tw_stat;
+                s_dot  = 0.0;
             }
         }
-
         // =====================================================================
         // 6. SICAKLIK DENKLEMİ
         // =====================================================================
