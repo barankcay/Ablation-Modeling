@@ -519,21 +519,20 @@ int main()
             d_T[i] = S_total*dx_i + a_time*T_old[i];
         }
 
-        // Arka yüzey: adiabatik
-        {
-            int i = N_nodes - 1;
-            double dxl_last = x[i] - x[i-1];
-            double cp_last  = cp_v*(1-alpha_eff[i]) + cp_c*alpha_eff[i];
-            double phi_last = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
-            double rho_g_l  = P_new[i]/(R_univ*max(T_old[i],1.0));
-            double rho_c_l  = rho_solid_new[i]*cp_last + rho_g_l*phi_last*cp_g;
-            double a_time_l = rho_c_l*(0.5*dxl_last)/dt;
-            double k_w_last = 2.0*k_node[i]*k_node[i-1]/(k_node[i]+k_node[i-1]);
-            a_T[i] = a_time_l + k_w_last/dxl_last;
-            b_T[i] = 0.0;
-            c_T[i] = k_w_last/dxl_last;
-            d_T[i] = a_time_l * T_old[i];
-        }
+
+        int i = N_nodes - 1;
+        double dxl_last = x[i] - x[i-1];
+        double cp_last  = cp_v*(1-alpha_eff[i]) + cp_c*alpha_eff[i];
+        double phi_last = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
+        double rho_g_l  = P_new[i]/(R_univ*max(T_old[i],1.0));
+        double rho_c_l  = rho_solid_new[i]*cp_last + rho_g_l*phi_last*cp_g;
+        double a_time_l = rho_c_l*(0.5*dxl_last)/dt;
+        double k_w_last = 2.0*k_node[i]*k_node[i-1]/(k_node[i]+k_node[i-1]);
+        a_T[i] = a_time_l + k_w_last/dxl_last;
+        b_T[i] = 0.0;
+        c_T[i] = k_w_last/dxl_last;
+        d_T[i] = a_time_l * T_old[i];
+        
 
         vector<double> T_new = thomas_patankar(a_T, b_T, c_T, d_T);
 
