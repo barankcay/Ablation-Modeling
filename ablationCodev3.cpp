@@ -246,7 +246,7 @@ int main()
     double T_wall        = T_back;
     double s_dot         = 0.0;
     double m_dot_g       = 0.0;
-    double k_surf        = k_v;
+    double k_surf        ;
     double h_eff         = h_0_external;
     double m_dot_surface = 0.0;
 
