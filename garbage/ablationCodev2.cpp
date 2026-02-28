@@ -221,7 +221,6 @@ int main()
     vector<vector<double>> alpha_old(N_comp, vector<double>(N_nodes, 0.0));
 
     double recession_total = 0.0;
-    double x_surface       = 0.0;
 
     bool   ablation_active = false;
     double T_wall        = T_back;
@@ -235,8 +234,8 @@ int main()
     // CSV
     // =========================================================================
     ofstream fout("ablation_history.csv");
-    fout << "time,Twall,T1,P0,mdot,heff,sdot_um_s,recession_mm,thickness_mm,mode,iter\n";
-    const int save_every = 2;
+    fout << "time,Twall,T1,P0,mdot,heff,sdot_mm_s,recession_mm,thickness_mm,mode,iter\n";
+    const int save_every = 1;
 
     printf("\n[LOOP] Basliyor...\n\n");
 
@@ -499,8 +498,7 @@ int main()
         // =====================================================================
         double recession_step = s_dot * dt;
         recession_total += recession_step;
-        x_surface       += recession_step;
-
+        vector<double> x_old = x;
         if (recession_step > 0.0)
         {
             if ((L_domain - recession_total) < 2.0*dx_surf)
@@ -515,16 +513,16 @@ int main()
             // t_shift: recession_step'in grid aralığına oranı (0..1)
             // recession_step << dx → t_shift << 1 → profil neredeyse değişmez
             // recession_step = dx  → t_shift = 1  → tam 1 node kayması
-            double t_shift = recession_step / dx_surf;
+            
 
             for (int j = 0; j < N_nodes-1; j++)
             {
-                T_new[j]         = (1-t_shift)*T_new[j]         + t_shift*T_new[j+1];
-                P_new[j]         = (1-t_shift)*P_new[j]         + t_shift*P_new[j+1];
-                rho_solid_new[j] = (1-t_shift)*rho_solid_new[j] + t_shift*rho_solid_new[j+1];
-                T_prev[j]        = (1-t_shift)*T_prev[j]        + t_shift*T_prev[j+1];
+                T_new[j]         = inverseAverage(T_new[j],x[j]-x_old[j], T_new[j+1], x_old[j+1]-x[j]);
+                P_new[j]         = inverseAverage(P_new[j],x[j]-x_old[j], P_new[j+1], x_old[j+1]-x[j]);
+                rho_solid_new[j] = inverseAverage(rho_solid_new[j],x[j]-x_old[j], rho_solid_new[j+1], x_old[j+1]-x[j]);
+                T_prev[j]        = inverseAverage(T_prev[j],x[j]-x_old[j], T_prev[j+1], x_old[j+1]-x[j]);
                 for (int c = 0; c < N_comp; c++)
-                    alpha_new[c][j] = (1-t_shift)*alpha_new[c][j] + t_shift*alpha_new[c][j+1];
+                    alpha_new[c][j] = inverseAverage(alpha_new[c][j],x[j]-x_old[j], alpha_new[c][j+1], x_old[j+1]-x[j]);
             }
 
             T_new[0] = T_wall;
@@ -550,19 +548,19 @@ int main()
         {
             fout << time << "," << T_wall << "," << T_old[1] << ","
                  << P_new[0] << "," << m_dot_surface << "," << h_eff << ","
-                 << s_dot*1e6 << "," << recession_total*1e3 << ","
+                 << s_dot*1e3 << "," << recession_total*1e3 << ","
                  << thickness_now*1e3 << ","
                  << (ablation_active ? "ABL" : "STA") << ","
                  << iter_count << "\n";
         }
 
-        if ((n % (save_every*10)) == 0 || n == 1 || n == nstep)
+        if ((n % (save_every*20)) == 0 || n == 1 || n == nstep)
         {
             printf("t=%7.1fs | %s | Tw=%7.1fK | T1=%7.1fK | heff=%6.1f | "
-                   "sdot=%8.3fum/s | erim=%8.4fmm | kalan=%7.3fmm | it=%d\n",
+                   "sdot=%8.3fmm/s | erim=%8.4fmm | kalan=%7.3fmm | it=%d\n",
                    time, ablation_active ? "ABL" : "STA",
                    T_wall, T_old[1], h_eff,
-                   s_dot*1e6, recession_total*1e3, thickness_now*1e3,
+                   s_dot*1e3, recession_total*1e3, thickness_now*1e3,
                    iter_count);
         }
     }
@@ -575,7 +573,7 @@ int main()
     printf("Final P[0]        : %.3f kPa\n", P_old[0]/1000.0);
     printf("Final mdot        : %.3e kg/m2s\n", m_dot_surface);
     printf("Final h_eff       : %.2f W/m2K\n", h_eff);
-    printf("Final s_dot       : %.4f um/s\n", s_dot*1e6);
+    printf("Final s_dot       : %.4f mm/s\n", s_dot*1e3);
     printf("Ablation active   : %s\n", ablation_active ? "EVET" : "HAYIR");
     printf("Toplam erime      : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik    : %.4f mm\n", (L_domain-recession_total)*1e3);
@@ -588,11 +586,11 @@ int main()
     double resid  = q_conv + q_rad + q_gas - q_cond;
 
     printf("\nYuzey isi akisi dengesi:\n");
-    printf("  q_conv = %+9.3f W/m2\n", q_conv/1e3);
-    printf("  q_rad  = %+9.3f W/m2\n", q_rad/1e3);
-    printf("  q_gas  = %+9.3f W/m2\n", q_gas/1e3);
-    printf("  q_cond = %+9.3f W/m2\n", q_cond/1e3);
-    printf("  resid  = %+9.3f W/m2\n", resid/1e3);
+    printf("  q_conv = %+9.3f kW/m2\n", q_conv/1e3);
+    printf("  q_rad  = %+9.3f kW/m2\n", q_rad/1e3);
+    printf("  q_gas  = %+9.3f kW/m2\n", q_gas/1e3);
+    printf("  q_cond = %+9.3f kW/m2\n", q_cond/1e3);
+    printf("  resid  = %+9.3f kW/m2\n", resid/1e3);
     printf("%s\n", string(80, '=').c_str());
     printf("Sonuclar: ablation_history.csv\n");
 
