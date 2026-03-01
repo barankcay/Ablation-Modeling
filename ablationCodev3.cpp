@@ -151,10 +151,10 @@ double compute_sdot(double h_eff, double m_dot_g, double k_surf,
 
     sd_den = rho_char * Delta_H_melt;
 
-    double sdot_raw = sd_num / sd_den;
+    double sdot = sd_num / sd_den;
 
     const double sdot_min = 1e-7;  // m/s  (0.1 µm/s)
-    return (sdot_raw > sdot_min) ? sdot_raw : 0.0;
+    return (sdot > sdot_min) ? sdot : 0.0;
 }
 
 // =============================================================================
@@ -222,9 +222,7 @@ int main()
     const double eps_T     = 0.1;   // K
     const double eps_sdot  = 1e-9;   // m/s
 
-    // ---- STABILIZE PATCH PARAMS ----
-    const double dT_hys  = 3.0;   // K (ABL aç/kapa histerezisi)
-    const double ur_sdot = 0.2;   // sdot under-relax (0..1)
+
     // --------------------------------
 
     printf("\n[INIT] dt=%.4f s, t_end=%.1f s, adim=%d\n", dt, t_end, nstep);
@@ -244,7 +242,6 @@ int main()
 
     bool   ablation_active = false;
     double T_wall        = T_back;
-    double s_dot         = 0.0;
     double m_dot_g       = 0.0;
     double k_surf        ;
     double h_eff         = h_0_external;
@@ -254,9 +251,9 @@ int main()
     // CSV
     // =========================================================================
     ofstream fout("ablation_history.csv");
-    // debug kolonları eklendi: Tw_stat, sdot_raw, dP01, dx_surf, k_surf
+    // debug kolonları eklendi: Tw_stat, sdot, dP01, dx_surf, k_surf
     fout << "time,Twall,T1,P0,mdot,heff,sdot_mm_s,recession_mm,thickness_mm,mode,iter,"
-            "Tw_stat,sdot_raw_mm_s,dP01_Pa,dx_surf_m,k_surf\n";
+            "Tw_stat,sdot_mm_s,dP01_Pa,dx_surf_m,k_surf\n";
     const int save_every = 2;
 
     printf("\n[LOOP] Basliyor...\n\n");
@@ -276,8 +273,8 @@ int main()
     vector<double> T_new(N_nodes);
 
     // debug cache
-    double dbg_Tw_stat = T_back;
-    double dbg_sdot_raw = 0.0;
+    double Tw_noabl = T_back;
+    double sdot = 0.0;
 
     // =========================================================================
     // TIME LOOP
@@ -389,7 +386,7 @@ int main()
         k_surf = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
 
         double T1         = T_old[1];
-        double sdot_iter  = s_dot;
+        double sdot_iter  = sdot;
         int    iter_count = 0;
 
         for (int it = 0; it < max_iter; it++)
@@ -406,76 +403,76 @@ int main()
 
             // --- a) STATE MACHINE ---
             double T_wall_new = T_wall;
-            double sdot_new_raw = 0.0;
+
 
             // statik Tw (ablasyon yok varsayımı)
-            dbg_Tw_stat = solve_Twall_NR(
+            Tw_noabl = solve_Twall_NR(
                 h_eff, m_dot_g, k_surf, T1, T_wall,
                 T_recovery, emissivity, sigma_SB, T_surr, dx_surf, cp_g);
 
             if (!ablation_active)
             {
                 // ABL açma şartı: Tablation + histerezis
-                if (dbg_Tw_stat >= (T_ablation + dT_hys))
+                if (Tw_noabl >= (T_ablation ))
                 {
-                    sdot_new_raw = compute_sdot(
+                    sdot = compute_sdot(
                         h_eff, m_dot_g, k_surf, T1, T_ablation,
                         emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                         rho_char_total, Delta_H_melt, T_recovery);
 
-                    if (sdot_new_raw > 0.0)
+                    if (sdot > 0.0)
                     {
                         ablation_active = true;
                         T_wall_new = T_ablation;
                     }
                     else
                     {
-                        T_wall_new = dbg_Tw_stat;
-                        sdot_new_raw = 0.0;
+                        T_wall_new = Tw_noabl;
+                        sdot = 0.0;
                     }
                 }
                 else
                 {
-                    T_wall_new = dbg_Tw_stat;
-                    sdot_new_raw = 0.0;
+                    T_wall_new = Tw_noabl;
+                    sdot = 0.0;
                 }
             }
             else
             {
                 // ABL modunda sdot
-                sdot_new_raw = compute_sdot(
+                sdot = compute_sdot(
                     h_eff, m_dot_g, k_surf, T1, T_ablation,
                     emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                     rho_char_total, Delta_H_melt, T_recovery);
 
-                if (sdot_new_raw > 0.0)
+                if (sdot > 0.0)
                 {
                     T_wall_new = T_ablation;
                 }
                 else
                 {
                     // Kapatma şartı: Tw_stat <= Tablation - histerezis
-                    if (dbg_Tw_stat <= (T_ablation - dT_hys))
+                    if (Tw_noabl <= (T_ablation ))
                     {
                         ablation_active = false;
-                        T_wall_new = dbg_Tw_stat;
-                        sdot_new_raw = 0.0;
+                        T_wall_new = Tw_noabl;
+                        sdot = 0.0;
                     }
                     else
                     {
                         // histerezis bandında: ABL'yi koru, sdot=0 (chatter kır)
                         T_wall_new = T_ablation;
-                        sdot_new_raw = 0.0;
+                        sdot = 0.0;
                     }
                 }
             }
 
-            dbg_sdot_raw = sdot_new_raw;
+
 
             // --- (ii) sdot under-relax ---
             double sdot_old_iter = sdot_iter;
-            sdot_iter = (1.0 - ur_sdot) * sdot_iter + ur_sdot * sdot_new_raw;
-            if (sdot_iter < 0.0) sdot_iter = 0.0;
+            sdot_iter = sdot;
+            
 
             // --- (iii) mdot/heff’i yeni Twall ile tekrar bağla (çok pahalı değil) ---
             Tw_for_rho = T_wall_new;
@@ -556,14 +553,13 @@ int main()
             if (dT1 < eps_T && dsdot < eps_sdot) break;
         }
 
-        s_dot = sdot_iter;
 
         // =====================================================================
         // 6. MOVING BOUNDARY + REMAP
         // Patch:
         //  - remap distance fabs+clamp (inverseAverage zaten bunu yapıyor)
         // =====================================================================
-        double recession_step = s_dot * dt;
+        double recession_step = sdot * dt;
         recession_total += recession_step;
 
         vector<double> x_old = x;
@@ -587,7 +583,6 @@ int main()
                 T_new[j]         = inverseAverage(T_new[j],         d1, T_new[j+1],         d2);
                 P_new[j]         = inverseAverage(P_new[j],         d1, P_new[j+1],         d2);
                 rho_solid_new[j] = inverseAverage(rho_solid_new[j], d1, rho_solid_new[j+1], d2);
-                T_prev[j]        = inverseAverage(T_prev[j],        d1, T_prev[j+1],        d2);
 
                 for (int c = 0; c < N_comp; c++)
                     alpha_new[c][j] = inverseAverage(alpha_new[c][j], d1, alpha_new[c][j+1], d2);
@@ -629,11 +624,11 @@ int main()
         {
             fout << time << "," << T_wall << "," << T_old[1] << ","
                  << P_new[0] << "," << m_dot_surface << "," << h_eff << ","
-                 << s_dot*1e3 << "," << recession_total*1e3 << ","
+                 << sdot*1e3 << "," << recession_total*1e3 << ","
                  << thickness_now*1e3 << ","
                  << (ablation_active ? "ABL" : "STA") << ","
                  << iter_count << ","
-                 << dbg_Tw_stat << "," << dbg_sdot_raw*1e3 << ","
+                 << Tw_noabl << "," << sdot*1e3 << ","
                  << (P_new[1]-P_new[0]) << "," << dx_surf << "," << k_surf
                  << "\n";
         }
@@ -644,7 +639,7 @@ int main()
                    "sdot=%8.3fmm/s | erim=%8.4fmm | kalan=%7.3fmm | it=%d\n",
                    time, ablation_active ? "ABL" : "STA",
                    T_wall, T_old[1], h_eff,
-                   s_dot*1e3, recession_total*1e3, thickness_now*1e3,
+                   sdot*1e3, recession_total*1e3, thickness_now*1e3,
                    iter_count);
         }
     }
@@ -659,7 +654,7 @@ int main()
     printf("Final P[0]        : %.3f kPa\n", P_old[0]/1000.0);
     printf("Final mdot        : %.3e kg/m2s\n", m_dot_surface);
     printf("Final h_eff       : %.2f W/m2K\n", h_eff);
-    printf("Final s_dot       : %.4f mm/s\n", s_dot*1e3);
+    printf("Final s_dot       : %.4f mm/s\n", sdot*1e3);
     printf("Ablation active   : %s\n", ablation_active ? "EVET" : "HAYIR");
     printf("Toplam erime      : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik    : %.4f mm\n", (L_domain-recession_total)*1e3);
