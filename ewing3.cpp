@@ -96,130 +96,288 @@ vector<double> thomas_patankar(const vector<double>& a,
 // TERMOFIZIKSEL TABLOLAR  (thermalProperties.csv - SI)
 // Virgin eps=0.8  /  Char eps=0.9
 // ============================================================
-struct ThermalTable{vector<double>T,cp,k,eps;}tbl_v,tbl_c;
-void init_virgin_table(){
-    double d[][4]={{256,879,0.398,0.8},{298,984,0.403,0.8},
-        {444,1300,0.416,0.8},{556,1470,0.453,0.8},{644,1570,0.470,0.8},
-        {833,1720,0.486,0.8},{1111,1860,0.523,0.8},{1389,1930,0.560,0.8},
-        {1667,1980,0.698,0.8},{1944,1990,0.872,0.8},{2222,2000,1.110,0.8},
-        {2778,2010,1.750,0.8},{3333,2010,2.780,0.8}};
-    for(auto&r:d){tbl_v.T.push_back(r[0]);tbl_v.cp.push_back(r[1]);
-                  tbl_v.k.push_back(r[2]);tbl_v.eps.push_back(r[3]);}}
-void init_char_table(){
-    double d[][4]={{256,733,0.398,0.9},{298,783,0.403,0.9},
-        {444,1090,0.416,0.9},{556,1320,0.453,0.9},{644,1430,0.470,0.9},
-        {833,1680,0.486,0.9},{1111,1840,0.523,0.9},{1389,1970,0.560,0.9},
-        {1667,2050,0.605,0.9},{1944,2090,0.729,0.9},{2222,2110,0.922,0.9},
-        {2778,2140,1.460,0.9},{3333,2150,2.320,0.9}};
-    for(auto&r:d){tbl_c.T.push_back(r[0]);tbl_c.cp.push_back(r[1]);
-                  tbl_c.k.push_back(r[2]);tbl_c.eps.push_back(r[3]);}}
-double interp1(const vector<double>&xv,const vector<double>&yv,double x){
-    int N=(int)xv.size();
-    if(x<=xv[0])return yv[0];if(x>=xv[N-1])return yv[N-1];
-    for(int i=0;i<N-1;i++)if(x<xv[i+1]){
-        double t=(x-xv[i])/(xv[i+1]-xv[i]);return yv[i]+t*(yv[i+1]-yv[i]);}
-    return yv[N-1];}
-double cp_v_T(double T){return interp1(tbl_v.T,tbl_v.cp,T);}
-double k_v_T (double T){return interp1(tbl_v.T,tbl_v.k, T);}
-double cp_c_T(double T){return interp1(tbl_c.T,tbl_c.cp,T);}
-double k_c_T (double T){return interp1(tbl_c.T,tbl_c.k, T);}
-double cp_mix(double T,double a){return cp_v_T(T)*(1.0-a)+cp_c_T(T)*a;}
-double k_mix (double T,double a){return k_v_T(T)*(1.0-a) +k_c_T(T)*a;}
-double eps_surf(double T,double a){
-    return interp1(tbl_v.T,tbl_v.eps,T)*(1.0-a)
-          +interp1(tbl_c.T,tbl_c.eps,T)*a;}
+// =============================================================================
+// TABLO + INTERP HELPERLARI (OKUNAKLI VERSIYON)
+// =============================================================================
 
-// ============================================================
-// PIROLIZ GAZI TABLOLARI  (pyrolysisModel.csv - 1 atm, SI)
+static inline double lerp(double a, double b, double t)
+{
+    return a + (b - a) * t;
+}
+
+// x: strictly increasing (T tablolari icin yeterli)
+double interp1_linear(const vector<double>& x, const vector<double>& y, double xq)
+{
+    const int N = (int)x.size();
+    if (N == 0) return 0.0;
+    if (N == 1) return y[0];
+
+    if (xq <= x[0])     return y[0];
+    if (xq >= x[N - 1]) return y[N - 1];
+
+    int i = 0;
+    while (i < N - 1 && xq > x[i + 1]) i++;
+
+    const double t = (xq - x[i]) / (x[i + 1] - x[i]);
+    return lerp(y[i], y[i + 1], t);
+}
+
+// =============================================================================
+// TERMOFIZIKSEL TABLOLAR (thermalProperties.csv - SI)
+// Virgin eps=0.8  /  Char eps=0.9
+// =============================================================================
+
+struct ThermalTable
+{
+    vector<double> T;
+    vector<double> cp;
+    vector<double> k;
+    vector<double> eps;
+};
+
+ThermalTable tbl_v, tbl_c;
+
+static void push_row_thermal(ThermalTable& tbl, double T, double cp, double k, double eps)
+{
+    tbl.T.push_back(T);
+    tbl.cp.push_back(cp);
+    tbl.k.push_back(k);
+    tbl.eps.push_back(eps);
+}
+
+void init_virgin_table()
+{
+    tbl_v = ThermalTable{};
+    push_row_thermal(tbl_v, 256,  879, 0.398, 0.8);
+    push_row_thermal(tbl_v, 298,  984, 0.403, 0.8);
+    push_row_thermal(tbl_v, 444, 1300, 0.416, 0.8);
+    push_row_thermal(tbl_v, 556, 1470, 0.453, 0.8);
+    push_row_thermal(tbl_v, 644, 1570, 0.470, 0.8);
+    push_row_thermal(tbl_v, 833, 1720, 0.486, 0.8);
+    push_row_thermal(tbl_v, 1111,1860, 0.523, 0.8);
+    push_row_thermal(tbl_v, 1389,1930, 0.560, 0.8);
+    push_row_thermal(tbl_v, 1667,1980, 0.698, 0.8);
+    push_row_thermal(tbl_v, 1944,1990, 0.872, 0.8);
+    push_row_thermal(tbl_v, 2222,2000, 1.110, 0.8);
+    push_row_thermal(tbl_v, 2778,2010, 1.750, 0.8);
+    push_row_thermal(tbl_v, 3333,2010, 2.780, 0.8);
+}
+
+void init_char_table()
+{
+    tbl_c = ThermalTable{};
+    push_row_thermal(tbl_c, 256,  733, 0.398, 0.9);
+    push_row_thermal(tbl_c, 298,  783, 0.403, 0.9);
+    push_row_thermal(tbl_c, 444, 1090, 0.416, 0.9);
+    push_row_thermal(tbl_c, 556, 1320, 0.453, 0.9);
+    push_row_thermal(tbl_c, 644, 1430, 0.470, 0.9);
+    push_row_thermal(tbl_c, 833, 1680, 0.486, 0.9);
+    push_row_thermal(tbl_c, 1111,1840, 0.523, 0.9);
+    push_row_thermal(tbl_c, 1389,1970, 0.560, 0.9);
+    push_row_thermal(tbl_c, 1667,2050, 0.605, 0.9);
+    push_row_thermal(tbl_c, 1944,2090, 0.729, 0.9);
+    push_row_thermal(tbl_c, 2222,2110, 0.922, 0.9);
+    push_row_thermal(tbl_c, 2778,2140, 1.460, 0.9);
+    push_row_thermal(tbl_c, 3333,2150, 2.320, 0.9);
+}
+
+double cp_v_T(double T) { return interp1_linear(tbl_v.T, tbl_v.cp, T); }
+double k_v_T (double T) { return interp1_linear(tbl_v.T, tbl_v.k,  T); }
+double cp_c_T(double T) { return interp1_linear(tbl_c.T, tbl_c.cp, T); }
+double k_c_T (double T) { return interp1_linear(tbl_c.T, tbl_c.k,  T); }
+
+double cp_mix(double T, double a) { return cp_v_T(T)*(1.0-a) + cp_c_T(T)*a; }
+double k_mix (double T, double a) { return k_v_T(T) *(1.0-a) + k_c_T(T) *a; }
+
+double eps_surf(double T, double a)
+{
+    const double eps_v = interp1_linear(tbl_v.T, tbl_v.eps, T);
+    const double eps_c = interp1_linear(tbl_c.T, tbl_c.eps, T);
+    return eps_v*(1.0-a) + eps_c*a;
+}
+
+// =============================================================================
+// PIROLIZ GAZI TABLOLARI (pyrolysisModel.csv - 1 atm, SI)
 // cp_g [J/kgK]  ve  mu_g [Pa.s]  T-bagli
-// ============================================================
-struct PyroGasTable{vector<double>T,cp,mu;}tbl_pg;
-void init_pyrogas_table(){
-    double d[][3]={
-        {200,1512.0,8.688e-06},{325,1676.0,1.351e-05},{450,2008.0,1.796e-05},
-        {575,2867.0,2.201e-05},{700,6351.0,2.586e-05},{825,16010.0,2.993e-05},
-        {950,11650.0,3.378e-05},{1075,3644.0,3.683e-05},{1200,6235.0,3.979e-05},
-        {1325,8707.0,4.371e-05},{1450,9674.0,4.708e-05},{1575,12530.0,4.880e-05},
-        {1700,7338.0,5.021e-05},{1825,4723.0,5.258e-05},{1950,4142.0,5.502e-05},
-        {2075,4080.0,5.744e-05},{2200,4270.0,5.984e-05},{2325,4670.0,6.224e-05},
-        {2450,5305.0,6.464e-05},{2575,6229.0,6.705e-05},{2700,7513.0,6.951e-05},
-        {2825,9238.0,7.201e-05},{2950,11500.0,7.461e-05},{3075,14390.0,7.731e-05},
-        {3200,17960.0,8.015e-05},{3325,22090.0,8.313e-05},{3450,26310.0,8.620e-05},
-        {3575,29830.0,8.917e-05},{3700,31960.0,9.183e-05},{3825,32440.0,9.398e-05},
-        {3950,31460.0,9.561e-05}};
-    for(auto&r:d){tbl_pg.T.push_back(r[0]);tbl_pg.cp.push_back(r[1]);
-                  tbl_pg.mu.push_back(r[2]);}}
-double cp_g_T(double T){return interp1(tbl_pg.T,tbl_pg.cp,T);}
-double mu_g_T(double T){return interp1(tbl_pg.T,tbl_pg.mu,T);}
+// =============================================================================
 
-// BPRIME TABLOSU — bprime_table.txt dosyasindan yuklenir
+struct PyroGasTable
+{
+    vector<double> T;
+    vector<double> cp;
+    vector<double> mu;
+};
+
+PyroGasTable tbl_pg;
+
+
+static void push_row_pyro_gas(PyroGasTable& tbl, double T, double cp, double mu)
+{
+    tbl.T.push_back(T);
+    tbl.cp.push_back(cp);
+    tbl.mu.push_back(mu);
+}
+
+void init_pyrogas_table()
+{
+    tbl_pg = PyroGasTable{};
+    push_row_pyro_gas(tbl_pg, 200, 1512.0, 8.688e-06);
+    push_row_pyro_gas(tbl_pg, 325, 1676.0, 1.351e-05);
+    push_row_pyro_gas(tbl_pg, 450, 2008.0, 1.796e-05);
+    push_row_pyro_gas(tbl_pg, 575, 2867.0, 2.201e-05);
+    push_row_pyro_gas(tbl_pg, 700, 6351.0, 2.586e-05);
+    push_row_pyro_gas(tbl_pg, 825, 16010.0, 2.993e-05);
+    push_row_pyro_gas(tbl_pg, 950, 11650.0, 3.378e-05);
+    push_row_pyro_gas(tbl_pg, 1075, 3644.0, 3.683e-05);
+    push_row_pyro_gas(tbl_pg, 1200, 6235.0, 3.979e-05);
+    push_row_pyro_gas(tbl_pg, 1325, 8707.0, 4.371e-05);
+    push_row_pyro_gas(tbl_pg, 1450, 9674.0, 4.708e-05);
+    push_row_pyro_gas(tbl_pg, 1575, 12530.0, 4.880e-05);
+    push_row_pyro_gas(tbl_pg, 1700, 7338.0, 5.021e-05);
+    push_row_pyro_gas(tbl_pg, 1825, 4723.0, 5.258e-05);
+    push_row_pyro_gas(tbl_pg, 1950, 4142.0, 5.502e-05);
+    push_row_pyro_gas(tbl_pg, 2075, 4080.0, 5.744e-05);
+    push_row_pyro_gas(tbl_pg, 2200, 4270.0, 5.984e-05);
+    push_row_pyro_gas(tbl_pg, 2325, 4670.0, 6.224e-05);
+    push_row_pyro_gas(tbl_pg, 2450, 5305.0, 6.464e-05);
+    push_row_pyro_gas(tbl_pg, 2575, 6229.0, 6.705e-05);
+    push_row_pyro_gas(tbl_pg, 2700, 7513.0, 6.951e-05);
+    push_row_pyro_gas(tbl_pg, 2825, 9238.0, 7.201e-05);
+    push_row_pyro_gas(tbl_pg, 2950, 11500.0, 7.461e-05);
+    push_row_pyro_gas(tbl_pg, 3075, 14390.0, 7.731e-05);
+    push_row_pyro_gas(tbl_pg, 3200, 17960.0, 8.015e-05);
+    push_row_pyro_gas(tbl_pg, 3325, 22090.0, 8.313e-05);
+    push_row_pyro_gas(tbl_pg, 3450, 26310.0, 8.620e-05);
+    push_row_pyro_gas(tbl_pg, 3575, 29830.0, 8.917e-05);
+    push_row_pyro_gas(tbl_pg, 3700, 31960.0, 9.183e-05);
+    push_row_pyro_gas(tbl_pg, 3825, 32440.0, 9.398e-05);
+    push_row_pyro_gas(tbl_pg, 3950, 31460.0, 9.561e-05);
+}
+
+double cp_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.cp, T); }
+double mu_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.mu, T); }
+
+// =============================================================================
+// BPRIME TABLOSU
 // Format: Bg   Tw[K]   Bc[-]   Tchem[J/kg]   (# yorum, bos satirlar atlanir)
 // =============================================================================
-struct BprimeTable {
-    vector<double>         bg_vals;
-    vector<vector<double>> Tw, Bc, Tchem;
-} bpt;
+
+struct BprimeTable
+{
+    vector<double> bg;                // [nBg]
+    vector<vector<double>> Tw;        // [nBg][nRow]
+    vector<vector<double>> Bc;        // [nBg][nRow]
+    vector<vector<double>> Tchem;     // [nBg][nRow]
+};
+
+BprimeTable bpt;
 
 void load_bprime_table(const string& fname)
 {
     ifstream fin(fname);
     if (!fin.is_open()) {
-        printf("ERROR: '%s' acilamiyor!\n", fname.c_str()); exit(1);
+        printf("ERROR: '%s' acilamiyor!\n", fname.c_str());
+        exit(1);
     }
-    double prev_bg=-1e99; int ibg=-1;
+
+    double prev_bg = -1e99;
+    int ibg = -1;
+
     string line;
-    while (getline(fin,line)) {
-        if (line.empty()||line[0]=='#') continue;
-        double bg,tw,bc,tchem;
-        if (sscanf(line.c_str(),"%lf %lf %lf %lf",&bg,&tw,&bc,&tchem)!=4) continue;
-        if (bg!=prev_bg) {
-            bpt.bg_vals.push_back(bg);
-            bpt.Tw.push_back({}); bpt.Bc.push_back({}); bpt.Tchem.push_back({});
-            ibg++; prev_bg=bg;
+    while (getline(fin, line))
+    {
+        if (line.empty()) continue;
+        if (line[0] == '#') continue;
+
+        double bg, tw, bc, tchem;
+        if (sscanf(line.c_str(), "%lf %lf %lf %lf", &bg, &tw, &bc, &tchem) != 4)
+            continue;
+
+        if (bg != prev_bg)
+        {
+            bpt.bg.push_back(bg);
+            bpt.Tw.push_back(vector<double>());
+            bpt.Bc.push_back(vector<double>());
+            bpt.Tchem.push_back(vector<double>());
+            ibg++;
+            prev_bg = bg;
         }
+
         bpt.Tw[ibg].push_back(tw);
         bpt.Bc[ibg].push_back(bc);
         bpt.Tchem[ibg].push_back(tchem);
     }
-    printf("[TABLE] %s: %d Bg grubu, %d satir/grup, Tw=[%.0f..%.0f]K\n",
-           fname.c_str(),(int)bpt.bg_vals.size(),(int)bpt.Tw[0].size(),
-           bpt.Tw[0].front(),bpt.Tw[0].back());
+
+    const int nBg   = (int)bpt.bg.size();
+    const int nRow  = (nBg > 0) ? (int)bpt.Tw[0].size() : 0;
+
+    printf("[TABLE] %s: %d Bg grubu, %d satir/grup\n",
+           fname.c_str(), nBg, nRow);
 }
 
-void find_bg_bracket(double Bg, int& ilo, int& ihi, double& frac)
+static void bg_bracket(double Bg, int& i0, int& i1, double& t)
 {
-    int N=(int)bpt.bg_vals.size();
-    if (Bg<=bpt.bg_vals[0])   {ilo=0;  ihi=0;  frac=0.0;return;}
-    if (Bg>=bpt.bg_vals[N-1]) {ilo=N-1;ihi=N-1;frac=0.0;return;}
-    for (int i=0;i<N-1;i++)
-        if (bpt.bg_vals[i+1]>=Bg) {
-            ilo=i; ihi=i+1;
-            frac=(Bg-bpt.bg_vals[i])/(bpt.bg_vals[i+1]-bpt.bg_vals[i]);
-            return;
-        }
+    const int N = (int)bpt.bg.size();
+    if (N == 0) { i0 = i1 = 0; t = 0.0; return; }
+
+    if (Bg <= bpt.bg[0])      { i0 = 0;   i1 = 0;   t = 0.0; return; }
+    if (Bg >= bpt.bg[N - 1])  { i0 = N-1; i1 = N-1; t = 0.0; return; }
+
+    int i = 0;
+    while (i < N - 1 && Bg > bpt.bg[i + 1]) i++;
+
+    i0 = i;
+    i1 = i + 1;
+    t  = (Bg - bpt.bg[i0]) / (bpt.bg[i1] - bpt.bg[i0]);
 }
 
-double interp_row(const vector<double>& v, double L)
+// L: 1..N row-index gibi kullanılıyor
+static double row_interp(const vector<double>& row, double L)
 {
-    int N=(int)v.size();
-    double idx=max(0.0,min((double)(N-1),L-1.0));
-    int jlo=(int)idx, jhi=min(jlo+1,N-1);
-    return v[jlo]+(idx-jlo)*(v[jhi]-v[jlo]);
+    const int N = (int)row.size();
+    if (N == 0) return 0.0;
+    if (N == 1) return row[0];
+
+    double idx = L - 1.0;
+    if (idx < 0.0) idx = 0.0;
+    if (idx > (double)(N - 1)) idx = (double)(N - 1);
+
+    const int j0 = (int)idx;
+    const int j1 = (j0 < N - 1) ? (j0 + 1) : j0;
+    const double tj = idx - j0;
+
+    return lerp(row[j0], row[j1], tj);
 }
 
-double lookup_Tw(double Bg, double L) {
-    int ilo,ihi;double frac;find_bg_bracket(Bg,ilo,ihi,frac);
-    return interp_row(bpt.Tw[ilo],L)+frac*(interp_row(bpt.Tw[ihi],L)-interp_row(bpt.Tw[ilo],L));
-}
-double lookup_Bc(double Bg, double L) {
-    int ilo,ihi;double frac;find_bg_bracket(Bg,ilo,ihi,frac);
-    return interp_row(bpt.Bc[ilo],L)+frac*(interp_row(bpt.Bc[ihi],L)-interp_row(bpt.Bc[ilo],L));
-}
-double lookup_Tchem(double Bg, double L) {
-    int ilo,ihi;double frac;find_bg_bracket(Bg,ilo,ihi,frac);
-    return interp_row(bpt.Tchem[ilo],L)+frac*(interp_row(bpt.Tchem[ihi],L)-interp_row(bpt.Tchem[ilo],L));
+double lookup_Tw(double Bg, double L)
+{
+    int i0, i1; double t;
+    bg_bracket(Bg, i0, i1, t);
+
+    const double v0 = row_interp(bpt.Tw[i0], L);
+    const double v1 = row_interp(bpt.Tw[i1], L);
+    return lerp(v0, v1, t);
 }
 
+double lookup_Bc(double Bg, double L)
+{
+    int i0, i1; double t;
+    bg_bracket(Bg, i0, i1, t);
+
+    const double v0 = row_interp(bpt.Bc[i0], L);
+    const double v1 = row_interp(bpt.Bc[i1], L);
+    return lerp(v0, v1, t);
+}
+
+double lookup_Tchem(double Bg, double L)
+{
+    int i0, i1; double t;
+    bg_bracket(Bg, i0, i1, t);
+
+    const double v0 = row_interp(bpt.Tchem[i0], L);
+    const double v1 = row_interp(bpt.Tchem[i1], L);
+    return lerp(v0, v1, t);
+}
 
 // =============================================================================
 // NEWTON-RAPHSON on L  (Ewing Eq.86-90)
@@ -288,7 +446,7 @@ int main()
     // =========================================================================
     // PARAMETRELER
     // =========================================================================
-    const double t_end = 500.0;
+    const double t_end = 100.0;
     const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
@@ -300,19 +458,34 @@ int main()
         x[m] = m * L_domain / (N_nodes - 1);
 
     const int N_comp = 3;
-    vector<double> B_arr   = {1.40e4,   9.75e8,   0.0};
-    vector<double> Psi_arr = {3.0,      3.0,      0.0};
-    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
+    vector<double> B_arr   = {1.200e4,   4.480e9,   0.0};
+    vector<double> Psi_arr = {3.0,       3.0,       0.0};
+    vector<double> E_arr   = {71.14e6,   169.92e6,  0.0};  // E/R: A=8556K, B=20440K
+    const double Gamma = 0.5;   // Resin volume fraction = 0.5
     const double R_univ    = 8.314;
 
     vector<double> E_over_R(N_comp);
     for (int c = 0; c < N_comp; c++)
         E_over_R[c] = (E_arr[c] / 1000.0) / R_univ;
 
-    vector<double> rho_v_comp = {325.015,  973.926,  2066.380};
-    vector<double> rho_c_comp = {0.0,      518.998,  2066.380};
-    const double Gamma = 0.422;
-
+    vector<double> rho_v_comp = {300.0,   900.0,   1600.0};
+    vector<double> rho_c_comp = {0.0,     600.0,   1600.0};
+    // -------------------------------------------------------------------------
+    // CMA d(rho)/dt -> alpha ODE dönüşümü için "etkin" pre-exponential:
+    //   d(rho)/dt = -A*rho_v*((rho-rho_c)/rho_v)^psi*exp(-E/RT)
+    //   rho = rho_v - (rho_v-rho_c)*alpha  ==>  d(alpha)/dt = Aeff*(1-alpha)^psi*exp(-E/RT)
+    //   Aeff = A * ((rho_v - rho_c)/rho_v)^(psi-1)
+    // -------------------------------------------------------------------------
+    vector<double> B_eff_arr = B_arr;
+    for (int c = 0; c < N_comp; c++)
+    {
+        if (B_arr[c] == 0.0) { B_eff_arr[c] = 0.0; continue; }
+        const double rv = rho_v_comp[c];
+        const double rc = rho_c_comp[c];
+        const double dr = rv - rc;
+        if (fabs(rv) < 1e-14 || fabs(dr) < 1e-14) { B_eff_arr[c] = 0.0; continue; }
+        B_eff_arr[c] = B_arr[c] * pow(dr / rv, Psi_arr[c] - 1.0);
+    }
     double rho_virgin     = Gamma*(rho_v_comp[0]+rho_v_comp[1])
                           + (1-Gamma)*rho_v_comp[2];
     double rho_char_total = Gamma*(rho_c_comp[0]+rho_c_comp[1])
@@ -410,10 +583,10 @@ int main()
         // =====================================================================
         for (int c = 0; c < N_comp; c++)
         {
-            if (B_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
+            if (B_eff_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
             for (int i = 0; i < N_nodes; i++)
             {
-                pyr_I   = B_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
+                pyr_I   = B_eff_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
                 pyr_ai  = alpha_old[c][i];
                 if (Psi_arr[c] == 1.0)
                 {
@@ -752,7 +925,8 @@ int main()
     printf("  q_rad  = %+12.3f kW/m2\n", q_rad/1000.0);
     printf("  q_chem = %+12.3f kW/m2\n", q_chem/1000.0);
     printf("  q_cond = %+12.3f kW/m2\n", q_cond/1000.0);
-    printf("  resid  = %+12.6f kW/m2  (~0 olmali)\n", resid/1000.0);
+    printf("  resid  = %+12.3f kW/m2\n", resid/1000.0);
+    printf("  Convergence Rate = %.6f %%\n", (resid/q_conv)*100.0);
     printf("%s\n", string(80, '=').c_str());
 
 

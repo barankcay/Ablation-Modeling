@@ -1,0 +1,13 @@
+﻿Suggested porosity;;;;
+Virgin;;Char;;
+0.8;;0.85;;(hyp: the matrix losses 50% of its mass and 50% of its volume during pyrolysis, i.e. shrinkage without change in density)
+;;;;
+Suggested permeability (continuum regime and low pore Reynolds number : Darcy);;;;
+in m^2;;;;
+Virgin;;Char;;
+1.60E-11;;2.00E-11;;(obtained by 2D Stokes simulation at the microscopic scale, in agreement with experimental data for similar materials)
+Viscosity and molar mass of the gas are given in the pyrolysis-gas section;;;;
+;;;;
+Suggested tortuosity  (continuum regime);;;;
+Virgin;;Char;;
+1.2;;1.1;;(obtained by 3D DSMC at the microscopic scale, no experimental data available)

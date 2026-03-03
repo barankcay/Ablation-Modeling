@@ -184,6 +184,23 @@ int main()
 
     vector<double> rho_v_comp = {325.015,  973.926,  2066.380};
     vector<double> rho_c_comp = {0.0,      518.998,  2066.380};
+
+        // -------------------------------------------------------------------------
+    // CMA d(rho)/dt -> alpha ODE dönüşümü için "etkin" pre-exponential:
+    //   d(rho)/dt = -A*rho_v*((rho-rho_c)/rho_v)^psi*exp(-E/RT)
+    //   rho = rho_v - (rho_v-rho_c)*alpha  ==>  d(alpha)/dt = Aeff*(1-alpha)^psi*exp(-E/RT)
+    //   Aeff = A * ((rho_v - rho_c)/rho_v)^(psi-1)
+    // -------------------------------------------------------------------------
+    vector<double> B_eff_arr = B_arr;
+    for (int c = 0; c < N_comp; c++)
+    {
+        if (B_arr[c] == 0.0) { B_eff_arr[c] = 0.0; continue; }
+        const double rv = rho_v_comp[c];
+        const double rc = rho_c_comp[c];
+        const double dr = rv - rc;
+        if (fabs(rv) < 1e-14 || fabs(dr) < 1e-14) { B_eff_arr[c] = 0.0; continue; }
+        B_eff_arr[c] = B_arr[c] * pow(dr / rv, Psi_arr[c] - 1.0);
+    }
     const double Gamma = 0.422;
 
     double rho_virgin     = Gamma*(rho_v_comp[0]+rho_v_comp[1])
@@ -281,10 +298,10 @@ int main()
         // =====================================================================
         for (int c = 0; c < N_comp; c++)
         {
-            if (B_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
+            if (B_eff_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
             for (int i = 0; i < N_nodes; i++)
             {
-                pyr_I   = B_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
+                pyr_I   = B_eff_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
                 pyr_ai  = alpha_old[c][i];
                 if (Psi_arr[c] == 1.0)
                 {
