@@ -175,8 +175,12 @@ int main()
     const int N_comp = 3;
     vector<double> B_arr   = {1.40e4,   9.75e8,   0.0};
     vector<double> Psi_arr = {3.0,      3.0,      0.0};
-    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
-    const double R_univ    = 8.314;
+    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0}; //BİRİMLER ÖNEMLİ
+    const double R_air    = 8.314;
+    const double Gamma = 0.5;   // Resin volume fraction = 0.5
+    const double R_univ = 8314.0; //J/kmol-K //BİRİMELR ÖNEMLİ
+    const double MW_air    = 28.97;          // kg/kmol
+    const double R_air     = R_univ / MW_air;  // ≈ 287 J/(kg·K)
 
     vector<double> E_over_R(N_comp);
     for (int c = 0; c < N_comp; c++)
@@ -201,7 +205,6 @@ int main()
         if (fabs(rv) < 1e-14 || fabs(dr) < 1e-14) { B_eff_arr[c] = 0.0; continue; }
         B_eff_arr[c] = B_arr[c] * pow(dr / rv, Psi_arr[c] - 1.0);
     }
-    const double Gamma = 0.422;
 
     double rho_virgin     = Gamma*(rho_v_comp[0]+rho_v_comp[1])
                           + (1-Gamma)*rho_v_comp[2];
@@ -358,15 +361,15 @@ int main()
             p_dxi = 0.5*(p_dxl + p_dxr);
 
             p_phi   = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
-            p_atime = p_phi / (R_univ*T_old[i]) * p_dxi / dt;
-            p_K     = P_old[i] / (R_univ*T_old[i]) * Gamma_perm/mu_g;
+            p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
+            p_K     = P_old[i] / (R_air*T_old[i]) * Gamma_perm/mu_g;
             p_ae    = p_K / p_dxr;
             p_aw    = p_K / p_dxl;
 
             p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
             p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;
-            p_Sptemp   = p_phi / (R_univ*T_old[i]*T_old[i]) * dT_dt[i];
-            p_Spporo   = (phi_v-phi_c) / (R_univ*T_old[i]) * p_dalpha;
+            p_Sptemp   = p_phi / (R_air*T_old[i]*T_old[i]) * dT_dt[i];
+            p_Spporo   = (phi_v-phi_c) / (R_air*T_old[i]) * p_dalpha;
             p_Slin     = p_Sptemp + p_Spporo;
 
             a_P[i] = p_atime + p_ae + p_aw - p_Slin*p_dxi;
@@ -380,7 +383,7 @@ int main()
         // =====================================================================
         // 4. BLOWING (dış iterasyon dışında ilk tahmin)
         // =====================================================================
-        m_dot_surface = (P_new[0]/(R_univ*T_old[0]))
+        m_dot_surface = (P_new[0]/(R_air*T_old[0]))
                       * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
         blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
         m_dot_g = m_dot_surface;
@@ -405,7 +408,7 @@ int main()
             // --- (i) iterasyon içi: mdot/heff güncelle (Twall’a bağlı yüzey yoğunluğu) ---
             // önce Twall tahmini olarak mevcut T_wall kullan
             double Tw_for_rho = T_wall;
-            m_dot_surface = (P_new[0]/(R_univ*Tw_for_rho))
+            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
                           * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
             m_dot_g = m_dot_surface;
@@ -485,7 +488,7 @@ int main()
 
             // --- (iii) mdot/heff’i yeni Twall ile tekrar bağla (çok pahalı değil) ---
             Tw_for_rho = T_wall_new;
-            m_dot_surface = (P_new[0]/(R_univ*Tw_for_rho))
+            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
                           * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
             m_dot_g = m_dot_surface;
@@ -509,7 +512,7 @@ int main()
                 t_ke = 2.0*k_node[i]*k_node[i+1] / (k_node[i]+k_node[i+1]);
                 t_kw = 2.0*k_node[i]*k_node[i-1] / (k_node[i]+k_node[i-1]);
 
-                t_rhogas = P_new[i] / (R_univ*T_old[i]);
+                t_rhogas = P_new[i] / (R_air*T_old[i]);
                 t_rhoc   = rho_solid_new[i]*t_cp + t_rhogas*t_phi*cp_g;
                 t_atime  = t_rhoc * t_dxi / dt;
                 t_ae     = t_ke / t_dxr;
@@ -537,7 +540,7 @@ int main()
                 t_dxl    = x[j] - x[j-1];
                 t_cp     = cp_v*(1-alpha_eff[j]) + cp_c*alpha_eff[j];
                 t_phi    = phi_v*(1-alpha_eff[j]) + phi_c*alpha_eff[j];
-                t_rhogas = P_new[j] / (R_univ*T_old[j]);
+                t_rhogas = P_new[j] / (R_air*T_old[j]);
                 t_rhoc   = rho_solid_new[j]*t_cp + t_rhogas*t_phi*cp_g;
                 t_atime  = t_rhoc * (0.5*t_dxl) / dt;
                 t_kw     = 2.0*k_node[j]*k_node[j-1] / (k_node[j]+k_node[j-1]);
