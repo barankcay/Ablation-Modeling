@@ -681,11 +681,13 @@ int main()
         // =====================================================================
         // 4. BLOWING (dış iterasyon dışında ilk tahmin)
         // =====================================================================
-        double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-        double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-        double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-        m_dot_surface = (P_new[0]/(R_air*T_old[0]))
-                      * (K_surf/mu_g_T(T_old[0])) * (P_new[1]-P_new[0]) / dx_surf;
+        {
+            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+            double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+            m_dot_surface = (P_new[0]/(R_air*T_old[0]))
+                        * (K_surf/mu_g_T(T_old[0])) * (P_new[1]-P_new[0]) / dx_surf;
+        }
         blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_old[0]), h_eff);
         m_dot_g = m_dot_surface;
 
@@ -709,11 +711,13 @@ int main()
             // --- (i) iterasyon içi: mdot/heff güncelle (Twall’a bağlı yüzey yoğunluğu) ---
             // önce Twall tahmini olarak mevcut T_wall kullan
             double Tw_for_rho = T_wall;
-            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-            double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                          * (K_surf/mu_g_T(T_wall)) * (P_new[1]-P_new[0]) / dx_surf;
+            {
+                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
+                            * (K_surf/mu_g_T(T_wall)) * (P_new[1]-P_new[0]) / dx_surf;
+            }
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_wall), h_eff);
             m_dot_g = m_dot_surface;
 
@@ -745,11 +749,13 @@ int main()
 
             // --- (iii) mdot/heff’i yeni Twall ile tekrar bağla (çok pahalı değil) ---
             Tw_for_rho = T_wall_new;
-            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-            double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                          * (K_surf/mu_g_T(T_wall_new)) * (P_new[1]-P_new[0]) / dx_surf;
+            {
+                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
+                            * (K_surf/mu_g_T(T_wall_new)) * (P_new[1]-P_new[0]) / dx_surf;
+            }
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_wall_new), h_eff);
             m_dot_g = m_dot_surface;
 
