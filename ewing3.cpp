@@ -650,10 +650,19 @@ int main()
 
             p_phi   = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
             p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
-            double K_i = K_v*(1.0-alpha_eff[i])+K_c*alpha_eff[i];
-            p_K     = P_old[i] / (R_air*T_old[i]) * K_i/mu_g_T(T_old[i]);
-            p_ae    = p_K / p_dxr;
-            p_aw    = p_K / p_dxl;
+            double K_i  = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+            double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];  // i-1
+            double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];  // i+1
+
+            // --- face-centered P interpolation (doğu/batı yüzler) ---
+            double P_e = 0.5*(P_old[i] + P_old[i+1]);   // doğu yüz
+            double P_w = 0.5*(P_old[i] + P_old[i-1]);   // batı yüz
+
+            // --- face permeability: harmonik ortalama ---
+            double K_e = 2.0*K_i*K_ip / (K_i + K_ip);
+            double K_w = 2.0*K_i*K_im / (K_i + K_im);
+            p_ae = P_e / (R_air*T_old[i]) * K_e / mu_g_T(T_old[i]) / p_dxr;
+            p_aw = P_w / (R_air*T_old[i]) * K_w / mu_g_T(T_old[i]) / p_dxl;
 
             p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
             p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;

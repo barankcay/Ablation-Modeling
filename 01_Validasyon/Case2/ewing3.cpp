@@ -570,13 +570,7 @@ int main()
     double sdot   = 0.0;
     double L_prev = 1.0;
     double Bg_now = 0.0, Bc_now = 0.0;
-    // --- basılacak zamanlar (Fig.12 ile aynı) ---
-    vector<double> snap_t = {0.1, 0.2, 0.3, 0.4, 1.0};
-    int snap_k = 0;
 
-    // --- başlangıçta BC'leri IC'ye de uygula (erken-zaman uyumu için iyi olur) ---
-    P_old[0] = P_surf;
-    P_old[N_nodes-1] = P_back;
     // =========================================================================
     // TIME LOOP
     // =========================================================================
@@ -649,52 +643,36 @@ int main()
 
         for (int i = 1; i < N_nodes-1; i++)
         {
-            const double dxw = x[i]   - x[i-1];
-            const double dxe = x[i+1] - x[i];
-            const double V   = 0.5*(dxw + dxe);   // control volume length (A=1)
+            p_dxl = x[i]   - x[i-1];
+            p_dxr = x[i+1] - x[i];
+            p_dxi = 0.5*(p_dxl + p_dxr);
 
-            // porosity at cell
-            const double phi = phi_v*(1.0 - alpha_eff[i]) + phi_c*alpha_eff[i];
+            p_phi   = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
+            p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
+            double K_i  = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+            double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];  // i-1
+            double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];  // i+1
 
-            // permeability at cell (case-2’de sabit zaten; yine de bırakıyorum)
-            const double K_i = K_v*(1.0 - alpha_eff[i]) + K_c*alpha_eff[i];
+            // --- face-centered P interpolation (doğu/batı yüzler) ---
+            double P_e = 0.5*(P_old[i] + P_old[i+1]);   // doğu yüz
+            double P_w = 0.5*(P_old[i] + P_old[i-1]);   // batı yüz
 
-            // -----------------------------
-            // FACE-BASED compressible Darcy:
-            // Γ = ρ K/μ,  ρ = P/(R T)
-            // Pe, Pw yüzey basınçları
-            // -----------------------------
-            const double T_i = T_old[i];
-            const double mu  = mu_g_T(T_i);
+            // --- face permeability: harmonik ortalama ---
+            double K_e = 2.0*K_i*K_ip / (K_i + K_ip);
+            double K_w = 2.0*K_i*K_im / (K_i + K_im);
+            p_ae = P_e / (R_air*T_old[i]) * K_e / mu_g_T(T_old[i]) / p_dxr;
+            p_aw = P_w / (R_air*T_old[i]) * K_w / mu_g_T(T_old[i]) / p_dxl;
 
-            const double P_e = 0.5*(P_old[i] + P_old[i+1]);
-            const double P_w = 0.5*(P_old[i-1] + P_old[i]);
+            p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
+            p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;
+            p_Sptemp   = p_phi / (R_air*T_old[i]*T_old[i]) * dT_dt[i];
+            p_Spporo   = (phi_v-phi_c) / (R_air*T_old[i]) * p_dalpha;
+            p_Slin     = p_Sptemp + p_Spporo;
 
-            const double rho_e = P_e / (R_air * T_i);
-            const double rho_w = P_w / (R_air * T_i);
-
-            const double Kappa_e = rho_e * (K_i / mu);   // Γe
-            const double Kappa_w = rho_w * (K_i / mu);   // Γw
-
-            const double aE = Kappa_e / dxe;
-            const double aW = Kappa_w / dxw;
-
-            // time term: φ/(R T) * V/dt
-            const double aT = (phi / (R_air * T_i)) * (V / dt);
-
-            // temperature/porosity kaynakları (senin mevcut formun)
-            const double aeff_old = (rho_virgin - rho_solid_old[i]) / (rho_virgin - rho_char_total);
-            const double dalpha   = (alpha_eff[i] - aeff_old) / dt;
-            const double Sptemp   = phi / (R_air * T_i * T_i) * dT_dt[i];
-            const double Spporo   = (phi_v - phi_c) / (R_air * T_i) * dalpha;
-            const double Slin     = Sptemp + Spporo;
-
-            a_P[i] = aT + aE + aW - Slin * V;
-            b_P[i] = aE;
-            c_P[i] = aW;
-
-            // drho_dt*V + aT*P_old
-            d_P[i] = drho_dt[i] * V + aT * P_old[i];
+            a_P[i] = p_atime + p_ae + p_aw - p_Slin*p_dxi;
+            b_P[i] = p_ae;
+            c_P[i] = p_aw;
+            d_P[i] = drho_dt[i]*p_dxi + p_atime*P_old[i];
         }
 
         P_new = thomas_patankar(a_P, b_P, c_P, d_P);
@@ -904,7 +882,7 @@ int main()
         // OUTPUT
         // =====================================================================
         double thickness_now = L_domain - recession_total;
-        if (n*dt==0.1)
+        if (n*dt==0.3)
         {
             for (int i = 0; i < N_nodes; i++)
             {

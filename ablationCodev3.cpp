@@ -55,11 +55,9 @@ void blowing_factor(double m_dot, double rho_e, double u_e,
 
     bf_phi = 2.0 * 0.5 * m_dot / denom;
 
-
     bf_Omega = bf_phi / (exp(bf_phi) - 1.0);
 
     h_eff_out = bf_Omega * h0;
-
 }
 
 // =============================================================================
@@ -69,9 +67,8 @@ void blowing_factor(double m_dot, double rho_e, double u_e,
 vector<double> thomas_patankar(const vector<double>& a,
                               const vector<double>& b,
                               const vector<double>& c,
-                              const vector<double>& d,const int N)
+                              const vector<double>& d, const int N)
 {
-
     vector<double> P(N), Q(N), T(N);
 
     P[0] = b[0] / a[0];
@@ -118,7 +115,7 @@ double solve_Twall_NR(double h_eff, double m_dot_g, double k_surf,
         nr_dTw = -nr_f / nr_df;
         nr_Tw  = nr_Tw + nr_dTw;
 
-        if (nr_Tw < 1.0) nr_Tw = 1.0;   // güvenlik
+        if (nr_Tw < 1.0) nr_Tw = 1.0;
         if (fabs(nr_dTw) < 1e-6) break;
     }
     return nr_Tw;
@@ -145,7 +142,7 @@ double compute_sdot(double h_eff, double m_dot_g, double k_surf,
 
     double sdot = sd_num / sd_den;
 
-    const double sdot_min = 1e-7;  // m/s  (0.1 µm/s)
+    const double sdot_min = 1e-7;
     return (sdot > sdot_min) ? sdot : 0.0;
 }
 
@@ -162,7 +159,7 @@ int main()
     // PARAMETRELER
     // =========================================================================
     const double t_end = 500.0;
-    const double dt    = 0.1;
+    const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
     const int    N_nodes  = 200;
@@ -175,26 +172,21 @@ int main()
     const int N_comp = 3;
     vector<double> B_arr   = {1.40e4,   9.75e8,   0.0};
     vector<double> Psi_arr = {3.0,      3.0,      0.0};
-    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0}; //BİRİMLER ÖNEMLİ
-    const double R_air    = 8.314;
-    const double Gamma = 0.5;   // Resin volume fraction = 0.5
-    const double R_univ = 8314.0; //J/kmol-K //BİRİMELR ÖNEMLİ
-    const double MW_air    = 28.97;          // kg/kmol
-    const double R_air     = R_univ / MW_air;  // ≈ 287 J/(kg·K)
+    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
+    const double Gamma = 0.5;
+    const double R_univ = 8314;   // J/kmol-K
+    const double MW_air = 28.97;    // kg/kmol
+    const double R_air  = R_univ / MW_air;  // ≈ 287 J/(kg·K)
+    const double T_reac[3] = {0, 0, 0};
+
 
     vector<double> E_over_R(N_comp);
     for (int c = 0; c < N_comp; c++)
-        E_over_R[c] = (E_arr[c] / 1000.0) / R_univ;
+        E_over_R[c] = (E_arr[c]) / R_univ;
 
     vector<double> rho_v_comp = {325.015,  973.926,  2066.380};
     vector<double> rho_c_comp = {0.0,      518.998,  2066.380};
 
-        // -------------------------------------------------------------------------
-    // CMA d(rho)/dt -> alpha ODE dönüşümü için "etkin" pre-exponential:
-    //   d(rho)/dt = -A*rho_v*((rho-rho_c)/rho_v)^psi*exp(-E/RT)
-    //   rho = rho_v - (rho_v-rho_c)*alpha  ==>  d(alpha)/dt = Aeff*(1-alpha)^psi*exp(-E/RT)
-    //   Aeff = A * ((rho_v - rho_c)/rho_v)^(psi-1)
-    // -------------------------------------------------------------------------
     vector<double> B_eff_arr = B_arr;
     for (int c = 0; c < N_comp; c++)
     {
@@ -215,31 +207,29 @@ int main()
     const double cp_v  = 1200.0, cp_c  = 1800.0;
     const double Q_p   = 0.5e7;
 
-    const double phi_v      = 0.10,  phi_c      = 0.80;
-    const double Gamma_perm = 1e-11, mu_g       = 3e-5;
-    const double cp_g       = 1000.0;
+    const double phi_v = 0.10, phi_c = 0.80;
+    const double K_v   = 1e-11, K_c  = 1e-11;  // virgin / char permeability [m^2]
+    const double mu_g  = 3e-5;
+    const double cp_g  = 1000.0;
 
     const double T_back = 300.0, P_surf = 101325.0, P_back = 101325.0;
 
     const double h_0_external = 200.0;
     const double T_recovery   = 8000.0;
-    const double rho_e        = 1.2,  u_e = 1500.0;
+    const double rho_e        = 1.2, u_e = 1500.0;
 
-    const double sigma_SB     = 5.67e-8;
-    const double T_surr       = 300.0, emissivity   = 0.85;
-    const double T_ablation   = 1996.0, Delta_H_melt = 160000.0;
+    const double sigma_SB   = 5.67e-8;
+    const double T_surr     = 300.0, emissivity   = 0.85;
+    const double T_ablation = 1996.0, Delta_H_melt = 160000.0;
 
-    // iterasyon parametreleri
-    const int    max_iter  = 40;
-    const double eps_T     = 0.1;   // K
-    const double eps_sdot  = 1e-9;   // m/s
-
-
-    // --------------------------------
+    const int    max_iter = 40;
+    const double eps_T    = 0.1;
+    const double eps_sdot = 1e-9;
 
     printf("\n[INIT] dt=%.4f s, t_end=%.1f s, adim=%d\n", dt, t_end, nstep);
     printf("  rho_virgin=%.1f  rho_char=%.1f kg/m3\n", rho_virgin, rho_char_total);
     printf("  dx=%.3f mm, N=%d\n", (x[1]-x[0])*1e3, N_nodes);
+    printf("  K_v=%.2e K_c=%.2e m^2, R_air=%.2f J/kg/K\n", K_v, K_c, R_air);
 
     // =========================================================================
     // BASLANGIC KOSULLARI
@@ -255,7 +245,7 @@ int main()
     bool   ablation_active = false;
     double T_wall        = T_back;
     double m_dot_g       = 0.0;
-    double k_surf        ;
+    double k_surf;
     double h_eff         = h_0_external;
     double m_dot_surface = 0.0;
 
@@ -263,7 +253,6 @@ int main()
     // CSV
     // =========================================================================
     ofstream fout("ablation_history.csv");
-    // debug kolonları eklendi: Tw_stat, sdot, dP01, dx_surf, k_surf
     fout << "time,Twall,T1,P0,mdot,heff,sdot_mm_s,recession_mm,thickness_mm,mode,iter,"
             "Tw_stat,sdot_mm_s,dP01_Pa,dx_surf_m,k_surf\n";
     const int save_every = 2;
@@ -284,7 +273,6 @@ int main()
     vector<double> a_T(N_nodes), b_T(N_nodes), c_T(N_nodes), d_T(N_nodes);
     vector<double> T_new(N_nodes);
 
-    // debug cache
     double Tw_noabl = T_back;
     double sdot = 0.0;
 
@@ -304,6 +292,10 @@ int main()
             if (B_eff_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
             for (int i = 0; i < N_nodes; i++)
             {
+                if (T_old[i] <= T_reac[c]) {
+                    alpha_new[c][i] = alpha_old[c][i];
+                    continue;
+                }
                 pyr_I   = B_eff_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
                 pyr_ai  = alpha_old[c][i];
                 if (Psi_arr[c] == 1.0)
@@ -338,8 +330,7 @@ int main()
         }
 
         // =====================================================================
-        // 2. dT/dt (pressure source için)
-        // Not: T_prev her step sonunda T_old yapılacak (daha temiz)
+        // 2. dT/dt
         // =====================================================================
         for (int i = 0; i < N_nodes; i++)
             dT_dt[i] = (T_old[i] - T_prev[i]) / dt;
@@ -351,8 +342,8 @@ int main()
         {
             a_P[i] = 0.0; b_P[i] = 0.0; c_P[i] = 0.0; d_P[i] = 0.0;
         }
-        a_P[0] = 1.0;         d_P[0]         = P_surf;
-        a_P[N_nodes-1] = 1.0; d_P[N_nodes-1] = P_back;
+        a_P[0] = 1.0;           d_P[0]         = P_surf;
+        a_P[N_nodes-1] = 1.0;   d_P[N_nodes-1] = P_back;
 
         for (int i = 1; i < N_nodes-1; i++)
         {
@@ -362,9 +353,23 @@ int main()
 
             p_phi   = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
             p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
-            p_K     = P_old[i] / (R_air*T_old[i]) * Gamma_perm/mu_g;
-            p_ae    = p_K / p_dxr;
-            p_aw    = p_K / p_dxl;
+
+            // --- cell permeability (virgin/char mixture) ---
+            double K_i  = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+            double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];  // i-1
+            double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];  // i+1
+
+            // --- face-centered P interpolation (doğu/batı yüzler) ---
+            double P_e = 0.5*(P_old[i] + P_old[i+1]);   // doğu yüz
+            double P_w = 0.5*(P_old[i] + P_old[i-1]);   // batı yüz
+
+            // --- face permeability: harmonik ortalama ---
+            double K_e = 2.0*K_i*K_ip / (K_i + K_ip);
+            double K_w = 2.0*K_i*K_im / (K_i + K_im);
+
+            // --- difüzyon katsayıları (face-centered P ve K) ---
+            p_ae = P_e / (R_air*T_old[i]) * K_e / mu_g / p_dxr;
+            p_aw = P_w / (R_air*T_old[i]) * K_w / mu_g / p_dxl;
 
             p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
             p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;
@@ -381,119 +386,97 @@ int main()
         P_new = thomas_patankar(a_P, b_P, c_P, d_P, N_nodes);
 
         // =====================================================================
-        // 4. BLOWING (dış iterasyon dışında ilk tahmin)
+        // 4. BLOWING (ilk tahmin)
         // =====================================================================
-        m_dot_surface = (P_new[0]/(R_air*T_old[0]))
-                      * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+        {
+            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+            double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+            m_dot_surface = (P_new[0]/(R_air*T_old[0]))
+                          * (K_surf/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+        }
         blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
         m_dot_g = m_dot_surface;
 
         // =====================================================================
         // 5. ITERATIF YUZEY + SICAKLIK COZUMU
-        // Patch:
-        //  - histerezis (dT_hys)
-        //  - sdot under-relax (ur_sdot)
-        //  - mdot/heff iterasyon içinde Twall_new ile güncelle (coupling)
         // =====================================================================
         k_surf = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
 
-        double T1         = T_old[1];
-        double sdot_iter  = sdot;
+        double T1        = T_old[1];
+        double sdot_iter = sdot;
         int    iter_count = 0;
 
         for (int it = 0; it < max_iter; it++)
         {
             iter_count = it + 1;
 
-            // --- (i) iterasyon içi: mdot/heff güncelle (Twall’a bağlı yüzey yoğunluğu) ---
-            // önce Twall tahmini olarak mevcut T_wall kullan
+            // (i) mdot/heff güncelle
             double Tw_for_rho = T_wall;
-            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                          * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+            {
+                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
+                              * (K_surf/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+            }
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
             m_dot_g = m_dot_surface;
 
-            // --- a) STATE MACHINE ---
+            // (a) STATE MACHINE
             double T_wall_new = T_wall;
 
-
-            // statik Tw (ablasyon yok varsayımı)
             Tw_noabl = solve_Twall_NR(
                 h_eff, m_dot_g, k_surf, T1, T_wall,
                 T_recovery, emissivity, sigma_SB, T_surr, dx_surf, cp_g);
 
             if (!ablation_active)
             {
-                // ABL açma şartı: Tablation + histerezis
-                if (Tw_noabl >= (T_ablation ))
+                if (Tw_noabl >= T_ablation)
                 {
                     sdot = compute_sdot(
                         h_eff, m_dot_g, k_surf, T1, T_ablation,
                         emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                         rho_char_total, Delta_H_melt, T_recovery);
 
-                    if (sdot > 0.0)
-                    {
-                        ablation_active = true;
-                        T_wall_new = T_ablation;
-                    }
-                    else
-                    {
-                        T_wall_new = Tw_noabl;
-                        sdot = 0.0;
-                    }
+                    if (sdot > 0.0) { ablation_active = true; T_wall_new = T_ablation; }
+                    else            { T_wall_new = Tw_noabl; sdot = 0.0; }
                 }
-                else
-                {
-                    T_wall_new = Tw_noabl;
-                    sdot = 0.0;
-                }
+                else { T_wall_new = Tw_noabl; sdot = 0.0; }
             }
             else
             {
-                // ABL modunda sdot
                 sdot = compute_sdot(
                     h_eff, m_dot_g, k_surf, T1, T_ablation,
                     emissivity, sigma_SB, T_surr, dx_surf, cp_g,
                     rho_char_total, Delta_H_melt, T_recovery);
 
-                if (sdot > 0.0)
-                {
-                    T_wall_new = T_ablation;
-                }
+                if (sdot > 0.0) { T_wall_new = T_ablation; }
                 else
                 {
-                    // Kapatma şartı: Tw_stat <= Tablation - histerezis
-                    if (Tw_noabl <= (T_ablation ))
-                    {
-                        ablation_active = false;
-                        T_wall_new = Tw_noabl;
-                        sdot = 0.0;
-                    }
+                    if (Tw_noabl <= T_ablation)
+                    { ablation_active = false; T_wall_new = Tw_noabl; sdot = 0.0; }
                     else
-                    {
-                        // histerezis bandında: ABL'yi koru, sdot=0 (chatter kır)
-                        T_wall_new = T_ablation;
-                        sdot = 0.0;
-                    }
+                    { T_wall_new = T_ablation; sdot = 0.0; }
                 }
             }
 
-
-
-            // --- (ii) sdot under-relax ---
             double sdot_old_iter = sdot_iter;
             sdot_iter = sdot;
-            
 
-            // --- (iii) mdot/heff’i yeni Twall ile tekrar bağla (çok pahalı değil) ---
+            // (iii) heff tekrar bağla
             Tw_for_rho = T_wall_new;
-            m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                          * (Gamma_perm/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+            {
+                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
+                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
+                              * (K_surf/mu_g) * (P_new[1]-P_new[0]) / dx_surf;
+            }
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g, h_eff);
             m_dot_g = m_dot_surface;
 
-            // --- b) SICAKLIK TDMA ---
+            // (b) SICAKLIK TDMA
             for (int i = 0; i < N_nodes; i++)
             {
                 a_T[i] = 0.0; b_T[i] = 0.0; c_T[i] = 0.0; d_T[i] = 0.0;
@@ -518,7 +501,9 @@ int main()
                 t_ae     = t_ke / t_dxr;
                 t_aw     = t_kw / t_dxl;
 
-                t_mdotgas = t_rhogas * (Gamma_perm/mu_g)
+                // Darcy flux: K_i (cell permeability)
+                double K_i2 = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+                t_mdotgas = t_rhogas * (K_i2/mu_g)
                           * (P_new[i+1]-P_new[i-1]) / (t_dxl+t_dxr);
                 t_hgrad   = cp_g * (T_old[i+1]-T_old[i-1]) / (t_dxl+t_dxr);
 
@@ -552,10 +537,8 @@ int main()
 
             T_new = thomas_patankar(a_T, b_T, c_T, d_T, N_nodes);
 
-            // --- c) T1 guncelle ---
             double T1_new = T_new[1];
 
-            // --- d) convergence ---
             double dT1   = fabs(T1_new   - T1);
             double dsdot = fabs(sdot_iter - sdot_old_iter);
 
@@ -565,11 +548,8 @@ int main()
             if (dT1 < eps_T && dsdot < eps_sdot) break;
         }
 
-
         // =====================================================================
         // 6. MOVING BOUNDARY + REMAP
-        // Patch:
-        //  - remap distance fabs+clamp (inverseAverage zaten bunu yapıyor)
         // =====================================================================
         double recession_step = sdot * dt;
         recession_total += recession_step;
@@ -602,7 +582,7 @@ int main()
 
             T_new[0] = T_wall;
             P_new[0] = P_surf;
-            // k_node'u remap sonrası alpha_new ile güncelle
+
             for (int j = 0; j < N_nodes; j++)
             {
                 rho_solid_new[j] =
@@ -617,10 +597,8 @@ int main()
 
         // =====================================================================
         // 7. UPDATE
-        // Patch:
-        //  - T_prev her step sonunda T_old yapılır (dT/dt tanımı net)
         // =====================================================================
-        T_prev = T_old;      // <<< PATCH (önceki karışıklığı kaldır)
+        T_prev = T_old;
 
         T_old         = T_new;
         P_old         = P_new;
@@ -671,10 +649,6 @@ int main()
     printf("Toplam erime      : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik    : %.4f mm\n", (L_domain-recession_total)*1e3);
 
-    // =============================================================================
-    // Yüzey enerji dengesi (W/m^2)
-    // Not: burada /1e3 YOK, doğrudan W/m^2 basıyoruz (kafa karışmasın)
-    // =============================================================================
     double q_conv = h_eff*(T_recovery - T_wall);
     double q_rad  = emissivity*sigma_SB*(pow(T_surr,4) - pow(T_wall,4));
     double q_gas  = m_dot_g*(cp_g*T_old[1] - cp_g*T_wall);
@@ -687,12 +661,9 @@ int main()
     printf("  q_gas  = %+12.3f kW/m2\n", q_gas/1000.0);
     printf("  q_cond = %+12.3f kW/m2\n", q_cond/1000.0);
     printf("  resid  = %+12.3f kW/m2\n", resid/1000.0);
-    printf("  Convergence Rate = %.6f %%\n", (resid/q_conv)*100.0);
+    printf("  Surface Balance = %.6f %%\n", (resid/q_conv)*100.0);
     printf("%s\n", string(80, '=').c_str());
-
-
-    
-
 
     return 0;
 }
+
