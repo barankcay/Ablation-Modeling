@@ -246,8 +246,8 @@ double mu_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.mu, T); }
 // Char @298K = 0 referans alınmış
 static const vector<double> Qp_T   = {256, 298, 444, 556, 644, 833, 
                                        1111, 1389, 1667, 1944, 2222, 2778, 3333};
-static const vector<double> Qp_val = {864540, 857000, 827400, 807800, 795200, 778240,
-                                       769100, 772600, 786000, 808000, 837000, 903000, 977000};
+static const vector<double> Qp_val = {-864540, -857000, -827400, -807800, -795200, -778240,
+                                       -769100, -772600, -786000, -808000, -837000, -903000, -977000};
 
 double Q_p_T(double T) { return interp1_linear(Qp_T, Qp_val, T); }
 
@@ -444,7 +444,7 @@ int main()
     // PARAMETRELER
     // =========================================================================
     const double t_end = 60.0;
-    const double dt    = 0.01;
+    const double dt    = 0.001;
     const int    nstep = (int)round(t_end / dt);
 
     const int    N_nodes  = 1001;
@@ -564,6 +564,7 @@ int main()
     vector<vector<double>> alpha_new(N_comp, vector<double>(N_nodes, 0.0));
     vector<double> rho_solid_new(N_nodes);
     vector<double> alpha_eff(N_nodes);
+    vector<double> alpha_eff_old(N_nodes, 0.0);   // <-- YENİ: bir önceki adımın alpha_eff'i
     vector<double> drho_dt(N_nodes);
     vector<double> k_node(N_nodes);
     vector<double> dT_dt(N_nodes);
@@ -583,7 +584,8 @@ int main()
     {
         double time    = n * dt;
         double dx_surf = x[1] - x[0];
-
+        // alpha_eff_old'u sakla (bu adım başlamadan önceki değer)
+        alpha_eff_old = alpha_eff;
         // =====================================================================
         // 1. PIROLIZ — alpha güncelle
         // =====================================================================
@@ -637,7 +639,7 @@ int main()
             double phi_i = phi_v*(1.0-alpha_eff[i]) + phi_c*alpha_eff[i];
             drho_dt[i] = 0.0;
             for (int c = 0; c < N_comp; c++)
-                drho_dt[i] -= (rho_v_comp[c]-rho_c_comp[c])
+                drho_dt[i] += (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
             drho_dt[i] *= (1.0 - phi_i);   // bulk'a donustu
             k_node[i] = k_mix(T_old[i], alpha_eff[i]);
@@ -657,7 +659,11 @@ int main()
             a_P[i] = 0.0; b_P[i] = 0.0; c_P[i] = 0.0; d_P[i] = 0.0;
         }
         a_P[0]         = 1.0; d_P[0]         = P_surf;
-        a_P[N_nodes-1] = 1.0; d_P[N_nodes-1] = P_back;
+        const int j = N_nodes - 1;
+        a_P[j] = 1.0;
+        b_P[j] = 0.0;
+        c_P[j] = 1.0;
+        d_P[j] = 0.0;
 
         for (int i = 1; i < N_nodes-1; i++)
         {
@@ -686,19 +692,13 @@ int main()
             p_Sptemp   = p_phi / (R_air*T_old[i]*T_old[i]) * dT_dt[i];
             p_Spporo   = (phi_v-phi_c) / (R_air*T_old[i]) * p_dalpha;
             p_Slin     = p_Sptemp + p_Spporo;
-
+            double d_alpha_eff_dt = (alpha_eff[i] - alpha_eff_old[i]) / dt;
             a_P[i] = p_atime + p_ae + p_aw - p_Slin*p_dxi;
             b_P[i] = p_ae;
             c_P[i] = p_aw;
-            d_P[i] = drho_dt[i]*p_dxi + p_atime*P_old[i];
+            d_P[i] = (rho_virgin-rho_char_total) * d_alpha_eff_dt * p_dxi + p_atime*P_old[i];
         }
-        {
-            const int j = N_nodes - 1;
-            a_P[j] = 1.0;
-            b_P[j] = 0.0;
-            c_P[j] = 1.0;
-            d_P[j] = 0.0;
-        }
+
 
         P_new = thomas_patankar(a_P, b_P, c_P, d_P);
 
@@ -807,9 +807,11 @@ int main()
                 t_hpyro  = t_hsolid
                          + rho_solid_new[i]*(cp_v_T(T_old[i])-cp_c_T(T_old[i]))*T_old[i]
                          / (rho_virgin - rho_char_total);
-                t_Spyro = -Q_p_T(T_old[i]) * drho_dt[i];
+                double d_alpha_eff_dt = (alpha_eff[i] - alpha_eff_old[i]) / dt;
+                t_Spyro = -(Q_p_T(T_old[i])) * (rho_virgin-rho_char_total) * d_alpha_eff_dt;
+                
                 // cout<<t_Spyro<<endl;
-                t_Stotal = t_Spyro - t_mdotgas*t_hgrad;
+                t_Stotal = t_Spyro + t_mdotgas*t_hgrad;
 
                 a_T[i] = t_atime + t_ae + t_aw;
                 b_T[i] = t_ae;
