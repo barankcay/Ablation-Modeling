@@ -242,6 +242,14 @@ void init_pyrogas_table()
 
 double cp_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.cp, T); }
 double mu_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.mu, T); }
+// h kolonları thermalProperties.csv'den (J/kg)
+// Char @298K = 0 referans alınmış
+static const vector<double> Qp_T   = {256, 298, 444, 556, 644, 833, 
+                                       1111, 1389, 1667, 1944, 2222, 2778, 3333};
+static const vector<double> Qp_val = {864540, 857000, 827400, 807800, 795200, 778240,
+                                       769100, 772600, 786000, 808000, 837000, 903000, 977000};
+
+double Q_p_T(double T) { return interp1_linear(Qp_T, Qp_val, T); }
 
 // =============================================================================
 // BPRIME TABLOSU
@@ -417,7 +425,7 @@ static double calc_rho_bulk(
       + (1.0-Gamma)*( rho_v_comp[2] - (rho_v_comp[2]-rho_c_comp[2])*alpha2 );
 
     double alpha_intr = (rho_intr_v - rho_intr) / (rho_intr_v - rho_intr_c);
-    alpha_intr = max(0.0, min(1.0, alpha_intr));
+
 
     double phi_i = phi_v*(1.0 - alpha_intr) + phi_c*alpha_intr;
     return (1.0 - phi_i) * rho_intr;
@@ -495,7 +503,7 @@ int main()
     const double rho_virgin     = (1.0-phi_v) * rho_intr_v;      //  280 kg/m³
     const double rho_char_total = (1.0-phi_c) * rho_intr_c;      //  165 kg/m³
 
-    const double Q_p = 0.5e7;   // J/kg, piroliz ısısı
+
 
     const double T_back  = 298.0, P_surf = 101325.0, P_back = 101325.0;
 
@@ -532,7 +540,7 @@ int main()
 
     double recession_total = 0.0;
 
-    double T_wall        = 1664.0;
+    double T_wall        = 1644.0;
     double m_dot_g       = 0.0;
     double k_surf;
     double h_eff         = h_0_external;
@@ -600,7 +608,7 @@ int main()
                     pyr_bkt  = pyr_I*(Psi_arr[c]-1.0) + pow(1.0-pyr_ai, 1.0-Psi_arr[c]);
                     pyr_anew = 1.0 - pow(pyr_bkt, pyr_exp);
                 }
-                alpha_new[c][i] = max(0.0, min(1.0, pyr_anew));
+                alpha_new[c][i] = pyr_anew;
             }
         }
 
@@ -622,17 +630,16 @@ int main()
             // alpha_eff: bulk bazli (rho_virgin ve rho_char_total da phi dahil)
             alpha_eff[i] = (rho_virgin - rho_solid_new[i])
                          / (rho_virgin - rho_char_total);
-            alpha_eff[i] = max(0.0, min(1.0, alpha_eff[i]));
+
 
             // drho_dt: intrinsik bilesenlerden, phi ile olcekle
             // phi_i mevcut alpha_eff ile hesaplanir
             double phi_i = phi_v*(1.0-alpha_eff[i]) + phi_c*alpha_eff[i];
             drho_dt[i] = 0.0;
             for (int c = 0; c < N_comp; c++)
-                drho_dt[i] += (rho_v_comp[c]-rho_c_comp[c])
+                drho_dt[i] -= (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
-            drho_dt[i] *= (1.0 - phi_i);   // bulk'a donustur
-
+            drho_dt[i] *= (1.0 - phi_i);   // bulk'a donustu
             k_node[i] = k_mix(T_old[i], alpha_eff[i]);
         }
 
@@ -685,6 +692,13 @@ int main()
             c_P[i] = p_aw;
             d_P[i] = drho_dt[i]*p_dxi + p_atime*P_old[i];
         }
+        {
+            const int j = N_nodes - 1;
+            a_P[j] = 1.0;
+            b_P[j] = 0.0;
+            c_P[j] = 1.0;
+            d_P[j] = 0.0;
+        }
 
         P_new = thomas_patankar(a_P, b_P, c_P, d_P);
 
@@ -720,19 +734,19 @@ int main()
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                m_dot_surface = (P_new[0]/(R_air*1664.0))
-                              * (K_surf2/mu_g_T(1664.0))
+                m_dot_surface = (P_new[0]/(R_air*1644.0))
+                              * (K_surf2/mu_g_T(1644.0))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(1664.0), h_eff);
+            blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(1644.0), h_eff);
             m_dot_g = m_dot_surface;
 
             // (a) NR on L
-            double cp_g_wall  = cp_g_T(1664.0);
+            double cp_g_wall  = cp_g_T(1644.0);
             Bg_now = m_dot_g * cp_g_wall / h_0_external;
             if (Bg_now < 0.0) Bg_now = 0.0;
 
-            double emissivity_now = eps_surf(1664.0, alpha_eff[0]);
+            double emissivity_now = eps_surf(1644.0, alpha_eff[0]);
             double L_cur = solve_L_NR(Bg_now, h_eff, k_surf, T1,
                                       T_recovery, emissivity_now, sigma_SB,
                                       T_surr, dx_surf, cp_g_wall, L_prev);
@@ -751,18 +765,18 @@ int main()
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                m_dot_surface = (P_new[0]/(R_air*1664.0))
-                              * (K_surf2/mu_g_T(1664.0))
+                m_dot_surface = (P_new[0]/(R_air*1644.0))
+                              * (K_surf2/mu_g_T(1644.0))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(1664.0), h_eff);
+            blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(1644.0), h_eff);
             m_dot_g = m_dot_surface;
 
             // (b) SICAKLIK TDMA
             for (int i = 0; i < N_nodes; i++)
                 a_T[i] = b_T[i] = c_T[i] = d_T[i] = 0.0;
 
-            a_T[0] = 1.0; d_T[0] = 1664.0;
+            a_T[0] = 1.0; d_T[0] = 1644.0;
 
             for (int i = 1; i < N_nodes-1; i++)
             {
@@ -793,7 +807,8 @@ int main()
                 t_hpyro  = t_hsolid
                          + rho_solid_new[i]*(cp_v_T(T_old[i])-cp_c_T(T_old[i]))*T_old[i]
                          / (rho_virgin - rho_char_total);
-                t_Spyro  = -(Q_p - t_hpyro + cp_g_T(T_old[i])*T_old[i]) * drho_dt[i];
+                t_Spyro = -Q_p_T(T_old[i]) * drho_dt[i];
+                // cout<<t_Spyro<<endl;
                 t_Stotal = t_Spyro - t_mdotgas*t_hgrad;
 
                 a_T[i] = t_atime + t_ae + t_aw;
@@ -825,7 +840,7 @@ int main()
             double dT1    = fabs(T1_new   - T1);
             double dsdot  = fabs(sdot_iter - sdot_old_iter);
 
-            T_wall = 1664.0;
+            T_wall = 1644.0;
             T1     = T1_new;
 
             if (dT1 < eps_T && dsdot < eps_sdot) break;
@@ -863,7 +878,7 @@ int main()
                     alpha_new[c][j] = inverseAverage(alpha_new[c][j], d1, alpha_new[c][j+1], d2);
             }
 
-            T_new[0] = 1664.0;
+            T_new[0] = 1644.0;
             P_new[0] = P_surf;
 
             // Remap sonrasi: phi-agirlikli bulk yogunluk yeniden hesapla
@@ -876,7 +891,7 @@ int main()
 
                 alpha_eff[j] = (rho_virgin - rho_solid_new[j])
                              / (rho_virgin - rho_char_total);
-                alpha_eff[j] = max(0.0, min(1.0, alpha_eff[j]));
+
 
                 k_node[j] = k_mix(T_old[j], alpha_eff[j]);
             }
@@ -899,16 +914,16 @@ int main()
 
         if ((n % (save_every*10) == 0 || n == 1 || n == nstep))
         {
-            fout << time << "," << 1664.0 << "," << T_old[1] << ","
+            fout << time << "," << 1644.0 << "," << T_old[1] << ","
                  << P_new[0] << "," << m_dot_surface << "," << h_eff << ","
                  << sdot*1e3 << "," << recession_total*1e3 << ","
                  << thickness_now*1e3 << ","
                  << Bg_now << "," << Bc_now << "," << L_prev << ","
-                 << eps_surf(1664.0, alpha_eff[0]) << "," << k_surf << ","
+                 << eps_surf(1644.0, alpha_eff[0]) << "," << k_surf << ","
                  << iter_count << "\n";
         }
 
-        fout2 << time << "," << x[20] << "," << T_old[20] << "\n";
+        fout2 << time << "," << x[80] << "," << T_old[80] << "\n";
     }
 
     fout.close();
@@ -916,7 +931,7 @@ int main()
 
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
-    printf("Final Twall       : %.2f K\n", 1664.0);
+    printf("Final Twall       : %.2f K\n", 1644.0);
     printf("Final T[0]        : %.2f K\n", T_old[0]);
     printf("Final T[1]        : %.2f K\n", T_old[1]);
     printf("Final P[0]        : %.3f kPa\n", P_old[0]/1000.0);
@@ -928,11 +943,11 @@ int main()
     printf("Toplam erime      : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik    : %.4f mm\n", (L_domain-recession_total)*1e3);
 
-    double eps_f  = eps_surf(1664.0, alpha_eff[0]);
-    double q_conv = h_eff*(T_recovery - 1664.0);
-    double q_rad  = eps_f*sigma_SB*(pow(T_surr,4) - pow(1664.0,4));
-    double q_chem = (h_eff/cp_g_T(1664.0))*lookup_Tchem(Bg_now, L_prev);
-    double q_cond = k_surf*(1664.0 - T_old[1])/(x[1]-x[0]);
+    double eps_f  = eps_surf(1644.0, alpha_eff[0]);
+    double q_conv = h_eff*(T_recovery - 1644.0);
+    double q_rad  = eps_f*sigma_SB*(pow(T_surr,4) - pow(1644.0,4));
+    double q_chem = (h_eff/cp_g_T(1644.0))*lookup_Tchem(Bg_now, L_prev);
+    double q_cond = k_surf*(1644.0 - T_old[1])/(x[1]-x[0]);
     double resid  = q_conv + q_rad + q_chem - q_cond;
 
     printf("\nYuzey enerji dengesi (kW/m2):\n");
@@ -943,6 +958,7 @@ int main()
     printf("  resid  = %+12.3f kW/m2\n", resid/1000.0);
     printf("  Convergence Rate = %.6f %%\n", (resid/q_conv)*100.0);
     printf("%s\n", string(80, '=').c_str());
+
 
     return 0;
 }

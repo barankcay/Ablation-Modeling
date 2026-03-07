@@ -440,13 +440,13 @@ double solve_L_NR(double Bg, double h_eff, double k_surf,
 int main()
 {
     cout << string(80, '=') << "\n";
-    cout << "ABLASYON ISI TRANSFERI v15 — Ewing NR-L + T-bagli termofizik + transport CSV\n";
+    cout << "ABLASYON ISI TRANSFERI v17 — Ewing NR-L + phi-agirlikli bulk yogunluk\n";
     cout << string(80, '=') << "\n";
 
     // =========================================================================
     // PARAMETRELER
     // =========================================================================
-    const double t_end = 100.0;
+    const double t_end = 500.0;
     const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
@@ -458,46 +458,34 @@ int main()
         x[m] = m * L_domain / (N_nodes - 1);
 
     const int N_comp = 3;
-    vector<double> B_arr   = {1.200e4,   4.480e9,   0.0};
-    vector<double> Psi_arr = {3.0,       3.0,       0.0};
-    vector<double> E_arr   = {71.14e6,   169.98e6,  0.0};
+    vector<double> B_arr   = {1.40e4,   9.75e8,   0.0};
+    vector<double> Psi_arr = {3.0,      3.0,      0.0};
+    vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
+    const double R_univ    = 8.314;
 
-    const double Gamma = 0.5;   // Resin volume fraction = 0.5
-    const double R_univ = 8314.0; //J/kmol-K
-    const double MW_air    = 28.97;          // kg/kmol
-    const double R_air     = R_univ / MW_air;  // ≈ 287 J/(kg·K)
-    const double T_reac[3] = {333.3, 555.6, 5556.0};
-
-    vector<double> E_over_R ={8.556E+03,2.044E+04,0.0   };
-    
-    vector<double> rho_v_comp = {300.0,   900.0,   1600.0};
-    vector<double> rho_c_comp = {0.0,     600.0,   1600.0};
-    // -------------------------------------------------------------------------
-    // CMA d(rho)/dt -> alpha ODE dönüşümü için "etkin" pre-exponential:
-    //   d(rho)/dt = -A*rho_v*((rho-rho_c)/rho_v)^psi*exp(-E/RT)
-    //   rho = rho_v - (rho_v-rho_c)*alpha  ==>  d(alpha)/dt = Aeff*(1-alpha)^psi*exp(-E/RT)
-    //   Aeff = A * ((rho_v - rho_c)/rho_v)^(psi-1)
-    // -------------------------------------------------------------------------
-    vector<double> B_eff_arr = B_arr;
+    vector<double> E_over_R(N_comp);
     for (int c = 0; c < N_comp; c++)
-    {
-        if (B_arr[c] == 0.0) { B_eff_arr[c] = 0.0; continue; }
-        const double rv = rho_v_comp[c];
-        const double rc = rho_c_comp[c];
-        const double dr = rv - rc;
-        if (fabs(rv) < 1e-14 || fabs(dr) < 1e-14) { B_eff_arr[c] = 0.0; continue; }
-        B_eff_arr[c] = B_arr[c] * pow(dr / rv, Psi_arr[c] - 1.0);
-    }
-    double rho_virgin     = Gamma*(rho_v_comp[0]+rho_v_comp[1])
-                          + (1-Gamma)*rho_v_comp[2];
-    double rho_char_total = Gamma*(rho_c_comp[0]+rho_c_comp[1])
-                          + (1-Gamma)*rho_c_comp[2];
+        E_over_R[c] = (E_arr[c] / 1000.0) / R_univ;
+
+    vector<double> rho_v_comp = {325.015,  973.926,  2066.380};
+    vector<double> rho_c_comp = {0.0,      518.998,  2066.380};
+    const double Gamma = 0.422;
+
 
     // k ve cp: T-bagli tablolardan (init_virgin/char_table)
     const double Q_p   = 0.5e7;
 
     // transportProperties.csv
     const double phi_v      = 0.8,   phi_c      = 0.85;
+
+    // Intrinsic (phi'siz) referans yogunluklar
+    const double rho_intr_v = Gamma*(rho_v_comp[0]+rho_v_comp[1])
+                            + (1.0-Gamma)*rho_v_comp[2];   // 1400 kg/m3
+    const double rho_intr_c = Gamma*(rho_c_comp[0]+rho_c_comp[1])
+                            + (1.0-Gamma)*rho_c_comp[2];   // 1100 kg/m3
+    // Bulk (phi dahil): rho = (1-phi)*rho_intrinsic
+    double rho_virgin     = (1.0-phi_v) * rho_intr_v;     //  280 kg/m3
+    double rho_char_total = (1.0-phi_c) * rho_intr_c;     //  165 kg/m3
     const double K_v        = 1.6e-11, K_c = 2.0e-11;  // permeability [m^2]
     // pyrolysisModel.csv -> T-bagli (cp_g_T, mu_g_T fonksiyonlari)
 
@@ -519,7 +507,8 @@ int main()
     // --------------------------------
 
     printf("\n[INIT] dt=%.4f s, t_end=%.1f s, adim=%d\n", dt, t_end, nstep);
-    printf("  rho_virgin=%.1f  rho_char=%.1f kg/m3\n", rho_virgin, rho_char_total);
+    printf("  rho_intr_v=%.1f  rho_intr_c=%.1f kg/m3\n", rho_intr_v, rho_intr_c);
+    printf("  rho_virgin=%.1f  rho_char=%.1f kg/m3 (phi dahil)\n", rho_virgin, rho_char_total);
     printf("  dx=%.3f mm, N=%d\n", (x[1]-x[0])*1e3, N_nodes);
 
     init_virgin_table();
@@ -585,14 +574,10 @@ int main()
         // =====================================================================
         for (int c = 0; c < N_comp; c++)
         {
-            if (B_eff_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
+            if (B_arr[c] == 0.0) { alpha_new[c] = alpha_old[c]; continue; }
             for (int i = 0; i < N_nodes; i++)
             {
-                if (T_old[i] <= T_reac[c]) {
-                    alpha_new[c][i] = alpha_old[c][i];
-                    continue;
-                }
-                pyr_I   = B_eff_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
+                pyr_I   = B_arr[c] * exp(-E_over_R[c] / T_old[i]) * dt;
                 pyr_ai  = alpha_old[c][i];
                 if (Psi_arr[c] == 1.0)
                 {
@@ -610,17 +595,25 @@ int main()
 
         for (int i = 0; i < N_nodes; i++)
         {
-            rho_solid_new[i] =
+            // phi-agirlikli bulk yogunluk: (1-phi(alpha))*rho_intrinsic
+            double rho_intr_i =
                 Gamma * ( (rho_v_comp[0]-(rho_v_comp[0]-rho_c_comp[0])*alpha_new[0][i])
                          +(rho_v_comp[1]-(rho_v_comp[1]-rho_c_comp[1])*alpha_new[1][i]) )
-              + (1-Gamma)*( rho_v_comp[2]-(rho_v_comp[2]-rho_c_comp[2])*alpha_new[2][i] );
+              + (1.0-Gamma)*( rho_v_comp[2]-(rho_v_comp[2]-rho_c_comp[2])*alpha_new[2][i] );
+            double alpha_intr_i = (rho_intr_v - rho_intr_i) / (rho_intr_v - rho_intr_c);
+            alpha_intr_i = max(0.0, min(1.0, alpha_intr_i));
+            double phi_i = phi_v*(1.0-alpha_intr_i) + phi_c*alpha_intr_i;
+            rho_solid_new[i] = (1.0 - phi_i) * rho_intr_i;
 
             alpha_eff[i] = (rho_virgin - rho_solid_new[i]) / (rho_virgin - rho_char_total);
+            alpha_eff[i] = max(0.0, min(1.0, alpha_eff[i]));
 
+            // drho_dt: phi ile olcekle (bulk kaynak terimi)
             drho_dt[i] = 0.0;
             for (int c = 0; c < N_comp; c++)
                 drho_dt[i] += (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
+            drho_dt[i] *= (1.0 - phi_i);
 
             k_node[i] = k_mix(T_old[i],alpha_eff[i]);
         }
@@ -649,25 +642,16 @@ int main()
             p_dxi = 0.5*(p_dxl + p_dxr);
 
             p_phi   = phi_v*(1-alpha_eff[i]) + phi_c*alpha_eff[i];
-            p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
-            double K_i  = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
-            double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];  // i-1
-            double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];  // i+1
-
-            // --- face-centered P interpolation (doğu/batı yüzler) ---
-            double P_e = 0.5*(P_old[i] + P_old[i+1]);   // doğu yüz
-            double P_w = 0.5*(P_old[i] + P_old[i-1]);   // batı yüz
-
-            // --- face permeability: harmonik ortalama ---
-            double K_e = 2.0*K_i*K_ip / (K_i + K_ip);
-            double K_w = 2.0*K_i*K_im / (K_i + K_im);
-            p_ae = P_e / (R_air*T_old[i]) * K_e / mu_g_T(T_old[i]) / p_dxr;
-            p_aw = P_w / (R_air*T_old[i]) * K_w / mu_g_T(T_old[i]) / p_dxl;
+            p_atime = p_phi / (R_univ*T_old[i]) * p_dxi / dt;
+            double K_i = K_v*(1.0-alpha_eff[i])+K_c*alpha_eff[i];
+            p_K     = P_old[i] / (R_univ*T_old[i]) * K_i/mu_g_T(T_old[i]);
+            p_ae    = p_K / p_dxr;
+            p_aw    = p_K / p_dxl;
 
             p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
             p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;
-            p_Sptemp   = p_phi / (R_air*T_old[i]*T_old[i]) * dT_dt[i];
-            p_Spporo   = (phi_v-phi_c) / (R_air*T_old[i]) * p_dalpha;
+            p_Sptemp   = p_phi / (R_univ*T_old[i]*T_old[i]) * dT_dt[i];
+            p_Spporo   = (phi_v-phi_c) / (R_univ*T_old[i]) * p_dalpha;
             p_Slin     = p_Sptemp + p_Spporo;
 
             a_P[i] = p_atime + p_ae + p_aw - p_Slin*p_dxi;
@@ -681,13 +665,8 @@ int main()
         // =====================================================================
         // 4. BLOWING (dış iterasyon dışında ilk tahmin)
         // =====================================================================
-        {
-            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-            double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-            m_dot_surface = (P_new[0]/(R_air*T_old[0]))
-                        * (K_surf/mu_g_T(T_old[0])) * (P_new[1]-P_new[0]) / dx_surf;
-        }
+        m_dot_surface = (P_new[0]/(R_univ*T_old[0]))
+                      * (K_v/mu_g_T(T_old[0])) * (P_new[1]-P_new[0]) / dx_surf;
         blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_old[0]), h_eff);
         m_dot_g = m_dot_surface;
 
@@ -711,13 +690,8 @@ int main()
             // --- (i) iterasyon içi: mdot/heff güncelle (Twall’a bağlı yüzey yoğunluğu) ---
             // önce Twall tahmini olarak mevcut T_wall kullan
             double Tw_for_rho = T_wall;
-            {
-                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                            * (K_surf/mu_g_T(T_wall)) * (P_new[1]-P_new[0]) / dx_surf;
-            }
+            m_dot_surface = (P_new[0]/(R_univ*Tw_for_rho))
+                          * (K_v/mu_g_T(T_wall)) * (P_new[1]-P_new[0]) / dx_surf;
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_wall), h_eff);
             m_dot_g = m_dot_surface;
 
@@ -749,13 +723,8 @@ int main()
 
             // --- (iii) mdot/heff’i yeni Twall ile tekrar bağla (çok pahalı değil) ---
             Tw_for_rho = T_wall_new;
-            {
-                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
-                double K_surf = 2.0*K_0*K_1 / (K_0 + K_1);
-                m_dot_surface = (P_new[0]/(R_air*Tw_for_rho))
-                            * (K_surf/mu_g_T(T_wall_new)) * (P_new[1]-P_new[0]) / dx_surf;
-            }
+            m_dot_surface = (P_new[0]/(R_univ*Tw_for_rho))
+                          * (K_v/mu_g_T(T_wall_new)) * (P_new[1]-P_new[0]) / dx_surf;
             blowing_factor(m_dot_surface, rho_e, u_e, h_0_external, cp_g_T(T_wall_new), h_eff);
             m_dot_g = m_dot_surface;
 
@@ -778,7 +747,7 @@ int main()
                 t_ke = 2.0*k_node[i]*k_node[i+1] / (k_node[i]+k_node[i+1]);
                 t_kw = 2.0*k_node[i]*k_node[i-1] / (k_node[i]+k_node[i-1]);
 
-                t_rhogas = P_new[i] / (R_air*T_old[i]);
+                t_rhogas = P_new[i] / (R_univ*T_old[i]);
                 t_rhoc   = rho_solid_new[i]*t_cp + t_rhogas*t_phi*cp_g_T(T_old[i]);
                 t_atime  = t_rhoc * t_dxi / dt;
                 t_ae     = t_ke / t_dxr;
@@ -807,7 +776,7 @@ int main()
                 t_dxl    = x[j] - x[j-1];
                 t_cp     = cp_mix(T_old[j],alpha_eff[j]);
                 t_phi    = phi_v*(1-alpha_eff[j]) + phi_c*alpha_eff[j];
-                t_rhogas = P_new[j] / (R_air*T_old[j]);
+                t_rhogas = P_new[j] / (R_univ*T_old[j]);
                 t_rhoc   = rho_solid_new[j]*t_cp + t_rhogas*t_phi*cp_g_T(T_old[j]);
                 t_atime  = t_rhoc * (0.5*t_dxl) / dt;
                 t_kw     = 2.0*k_node[j]*k_node[j-1] / (k_node[j]+k_node[j-1]);
@@ -869,14 +838,19 @@ int main()
 
             T_new[0] = T_wall;
             P_new[0] = P_surf;
-            // k_node'u remap sonrası alpha_new ile güncelle
+            // k_node'u remap sonrasi alpha_new ile guncelle (phi-agirlikli)
             for (int j = 0; j < N_nodes; j++)
             {
-                rho_solid_new[j] =
+                double rho_intr_j =
                     Gamma * ( (rho_v_comp[0]-(rho_v_comp[0]-rho_c_comp[0])*alpha_new[0][j])
                             +(rho_v_comp[1]-(rho_v_comp[1]-rho_c_comp[1])*alpha_new[1][j]) )
-                + (1-Gamma)*( rho_v_comp[2]-(rho_v_comp[2]-rho_c_comp[2])*alpha_new[2][j] );
+                + (1.0-Gamma)*( rho_v_comp[2]-(rho_v_comp[2]-rho_c_comp[2])*alpha_new[2][j] );
+                double alpha_intr_j = (rho_intr_v - rho_intr_j) / (rho_intr_v - rho_intr_c);
+                alpha_intr_j = max(0.0, min(1.0, alpha_intr_j));
+                double phi_j = phi_v*(1.0-alpha_intr_j) + phi_c*alpha_intr_j;
+                rho_solid_new[j] = (1.0 - phi_j) * rho_intr_j;
                 alpha_eff[j] = (rho_virgin - rho_solid_new[j]) / (rho_virgin - rho_char_total);
+                alpha_eff[j] = max(0.0, min(1.0, alpha_eff[j]));
                 k_node[j]    = k_mix(T_old[j],alpha_eff[j]);
             }
             k_surf = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
