@@ -585,8 +585,8 @@ int main()
             double P_e = 0.5*(P_old[i] + P_old[i+1]);
             double P_w = 0.5*(P_old[i] + P_old[i-1]);
 
-            p_ae = P_e / (R_univ*T_old[i]) * K_e / mu_g_T(T_old[i]) / p_dxr;
-            p_aw = P_w / (R_univ*T_old[i]) * K_w / mu_g_T(T_old[i]) / p_dxl;
+            p_ae = (P_e / (R_univ*T_old[i])) * (K_e / mu_g_T(T_old[i])) / p_dxr;
+            p_aw = (P_w / (R_univ*T_old[i])) * (K_w / mu_g_T(T_old[i])) / p_dxl;
 
             p_aeff_old = (rho_virgin-rho_solid_old[i]) / (rho_virgin-rho_char_total);
             p_dalpha   = (alpha_eff[i] - p_aeff_old) / dt;
