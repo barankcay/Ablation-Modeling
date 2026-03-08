@@ -444,7 +444,7 @@ int main()
     // PARAMETRELER
     // =========================================================================
     const double t_end = 60.0;
-    const double dt    = 0.001;
+    const double dt    = 0.1;
     const int    nstep = (int)round(t_end / dt);
 
     const int    N_nodes  = 1001;
@@ -455,7 +455,7 @@ int main()
         x[m] = m * L_domain / (N_nodes - 1);
 
     const int N_comp = 3;
-    vector<double> B_arr   = {1.200e4,  4.480e9,  0.0};
+    vector<double> B_arr = {1.200e4,  4.480e9,  0.0};
     vector<double> Psi_arr = {3.0,      3.0,      0.0};
     vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
 
@@ -551,9 +551,12 @@ int main()
     // =========================================================================
     ofstream fout("ablation_history.csv");
     ofstream fout2("tempData.txt");
+    ofstream fout3("frontData.txt");   // <-- EKLE
+
     fout << "time,Twall,T1,P0,mdot,heff,sdot_mm_s,recession_mm,thickness_mm,"
             "Bg,Bc,L_nr,eps_surf,k_surf,iter\n";
     fout2 << "t [s],x [m],T [K]\n";
+    fout3 << "time,x_char_[m],x_pyro_[m]\n";  // <-- EKLE
     const int save_every = 2;
 
     printf("\n[LOOP] Basliyor...\n\n");
@@ -632,7 +635,7 @@ int main()
             // alpha_eff: bulk bazli (rho_virgin ve rho_char_total da phi dahil)
             alpha_eff[i] = (rho_virgin - rho_solid_new[i])
                          / (rho_virgin - rho_char_total);
-
+            
 
             // drho_dt: intrinsik bilesenlerden, phi ile olcekle
             // phi_i mevcut alpha_eff ile hesaplanir
@@ -924,12 +927,47 @@ int main()
                  << eps_surf(1644.0, alpha_eff[0]) << "," << k_surf << ","
                  << iter_count << "\n";
         }
+        double x_char_front = 0.0;
 
-        fout2 << time << "," << x[80] << "," << T_old[80] << "\n";
+        for (int i = 0; i < N_nodes-1; i++)
+        {
+            if (alpha_eff[i] >= 0.98 && alpha_eff[i+1] < 0.98)
+            {
+                double a1 = alpha_eff[i];
+                double a2 = alpha_eff[i+1];
+
+                double frac = (0.98 - a1) / (a2 - a1);
+
+                x_char_front = x[i] + frac * (x[i+1] - x[i]);
+                break;
+            }
+        }
+
+        double x_pyro_front = 0.0;
+
+        for (int i = 0; i < N_nodes-1; i++)
+        {
+            if (alpha_eff[i] >= 0.02 && alpha_eff[i+1] < 0.02)
+            {
+                double a1 = alpha_eff[i];
+                double a2 = alpha_eff[i+1];
+
+                double frac = (0.02 - a1) / (a2 - a1);
+
+                x_pyro_front = x[i] + frac * (x[i+1] - x[i]);
+                break;
+            }
+        }
+        fout3 << time << "," << x_char_front << "," << x_pyro_front << "\n";
+
+        fout2 << time << "," << x[80] << "," << T_old[80] << "\n";  // mevcut satır
+
+
     }
 
     fout.close();
     fout2.close();
+    fout3.close();
 
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
