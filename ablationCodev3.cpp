@@ -387,11 +387,11 @@ int main()
             p_Sptemp   = p_phi / (R_air*T_old[i]*T_old[i]) * dT_dt[i];
             p_Spporo   = (phi_v-phi_c) / (R_air*T_old[i]) * p_dalpha;
             p_Slin     = p_Sptemp + p_Spporo;
-
+            double d_alpha_eff_dt = (alpha_eff[i] - alpha_eff_old[i]) / dt;
             a_P[i] = p_atime + p_ae + p_aw - p_Slin*p_dxi;
             b_P[i] = p_ae;
             c_P[i] = p_aw;
-            d_P[i] = drho_dt[i]*p_dxi + p_atime*P_old[i];
+            d_P[i] = (rho_virgin-rho_char_total) * d_alpha_eff_dt * p_dxi + p_atime*P_old[i];
         }
 
         P_new = thomas_patankar(a_P, b_P, c_P, d_P);
