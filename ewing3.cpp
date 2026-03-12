@@ -553,7 +553,7 @@ int main()
 
 
     fout << "time,Twall,T1,P0,mdot,heff,sdot_mm_s,recession_mm,thickness_mm,"
-            "Bg,Bc,L_nr,eps_surf,k_surf,iter\n";
+            "Bg,Bc,L_nr,eps_surf,k_surf,iter,converged,resid_pct\n";
 
     const int save_every = 2;
 
@@ -577,6 +577,11 @@ int main()
     double sdot   = 0.0;
     double L_prev = 1.0;
     double Bg_now = 0.0, Bc_now = 0.0;
+
+    // Yakinsama takibi
+    int n_converged     = 0;
+    int n_not_converged = 0;
+    int max_iters_used  = 0;
 
     // =========================================================================
     // TIME LOOP
@@ -851,6 +856,21 @@ int main()
             if (dT1 < eps_T && dsdot < eps_sdot) break;
         }
 
+        // Yakinsama kontrolu
+        bool iter_converged = (iter_count < max_iter);
+        if (iter_converged) n_converged++;
+        else                n_not_converged++;
+        if (iter_count > max_iters_used) max_iters_used = iter_count;
+
+        // Yuzeydeki enerji dengesi residual'i (her adim icin)
+        double eps_now   = eps_surf(T_wall, alpha_eff[0]);
+        double q_conv_s  = h_eff * (T_recovery - T_wall);
+        double q_rad_s   = eps_now * sigma_SB * (pow(T_surr, 4) - pow(T_wall, 4));
+        double q_chem_s  = (h_eff / cp_g_T(T_wall)) * lookup_Tchem(Bg_now, L_prev);
+        double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
+        double resid_s   = q_conv_s + q_rad_s + q_chem_s - q_cond_s;
+        double resid_pct_s = (fabs(q_conv_s) > 1e-10) ? (resid_s / q_conv_s) * 100.0 : 0.0;
+
         // =====================================================================
         // 7. MOVING BOUNDARY + REMAP
         // =====================================================================
@@ -925,17 +945,23 @@ int main()
                  << thickness_now*1e3 << ","
                  << Bg_now << "," << Bc_now << "," << L_prev << ","
                  << eps_surf(T_wall, alpha_eff[0]) << "," << k_surf << ","
-                 << iter_count << "\n";
+                 << iter_count << ","
+                 << (iter_converged ? 1 : 0) << ","
+                 << resid_pct_s << "\n";
         }
         if ((n % (save_every*10)) == 0 || n == 1 || n == nstep)
         {
             printf("t=%7.1fs | Tw=%7.1fK | T1=%7.1fK | heff=%6.1f | "
                    "Bg=%.3f Bc=%.4f L=%5.2f eps=%.3f k=%.3f | "
-                   "sdot=%7.4fmm/s | erim=%7.4fmm | it=%d\n",
+                   "sdot=%7.4fmm/s | erim=%7.4fmm | "
+                   "it=%d %s | resid=%+.3f%%\n",
                    time, T_wall, T_old[1], h_eff,
                    Bg_now, Bc_now, L_prev,
                    eps_surf(T_wall,alpha_eff[0]), k_surf,
-                   sdot*1e3, recession_total*1e3, iter_count);
+                   sdot*1e3, recession_total*1e3,
+                   iter_count,
+                   iter_converged ? "[CONV]" : "[WARN:MAX_ITER]",
+                   resid_pct_s);
         }
 
 
@@ -973,8 +999,22 @@ int main()
     printf("  q_cond = %+12.3f kW/m2\n", q_cond/1000.0);
     printf("  resid  = %+12.3f kW/m2\n", resid/1000.0);
     printf("  Convergence Rate = %.6f %%\n", (resid/q_conv)*100.0);
-    printf("%s\n", string(80, '=').c_str());
 
+    int n_total_steps = n_converged + n_not_converged;
+    printf("\nYAKINSAMA OZETI:\n");
+    printf("  Toplam zaman adimi      : %d\n", n_total_steps);
+    printf("  Yakinsayan adim         : %d  (%.1f%%)\n",
+           n_converged,
+           n_total_steps > 0 ? 100.0 * n_converged / n_total_steps : 0.0);
+    printf("  Yakinsamayan adim [WARN]: %d  (%.1f%%)\n",
+           n_not_converged,
+           n_total_steps > 0 ? 100.0 * n_not_converged / n_total_steps : 0.0);
+    printf("  Kullanilan maks iter    : %d / %d\n", max_iters_used, max_iter);
+    if (n_not_converged == 0)
+        printf("  Sonuc: TUM ADIMLAR YAKINSADI.\n");
+    else
+        printf("  Sonuc: DIKKAT — %d adimda yakinsama saglanamadi!\n", n_not_converged);
+    printf("%s\n", string(80, '=').c_str());
 
     return 0;
 }
