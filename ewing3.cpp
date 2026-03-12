@@ -444,7 +444,7 @@ int main()
     // PARAMETRELER
     // =========================================================================
     const double t_end = 60.0;
-    const double dt    = 0.1;
+    const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
     const int    N_nodes  = 1001;
