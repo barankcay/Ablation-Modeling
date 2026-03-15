@@ -392,8 +392,7 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
 
         double f = (k_surf/dx_surf)*(Tw - T1)
                  - rho_ue_CH*(H_recovery - h_w)
-                 - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4))
-                 + rho_ue_CH*Tchem;
+                 - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4));
 
         double dL   = 0.01;
         double Tw2  = lookup_Tw(Bg, L + dL);
@@ -402,8 +401,7 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
 
         double f2 = (k_surf/dx_surf)*(Tw2 - T1)
                   - rho_ue_CH*(H_recovery - h_w2)
-                  - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw2,4))
-                  + rho_ue_CH*Tc2;
+                  - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw2,4));
 
         double dfdL = (f2 - f) / dL;
         if (fabs(dfdL) < 1e-30) break;
@@ -865,7 +863,7 @@ int main()
         double q_rad_s   = 0.0;   // Case 5: radyasyon yok
         double q_chem_s  = h_eff * lookup_Tchem(Bg_now, L_prev);
         double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
-        double resid_s   = q_conv_s + q_rad_s - q_chem_s - q_cond_s;
+        double resid_s   = q_conv_s + q_rad_s - q_cond_s;   // Tchem diagnostik, NR'de yok
         double resid_pct_s = (fabs(q_conv_s) > 1e-10) ? (resid_s / q_conv_s) * 100.0 : 0.0;
 
         // =====================================================================
@@ -980,7 +978,7 @@ int main()
     double q_rad  = 0.0;   // Case 5: radyasyon yok
     double q_chem = h_eff * lookup_Tchem(Bg_now, L_prev);
     double q_cond = k_surf * (T_wall - T_old[1]) / (x[1]-x[0]);
-    double resid  = q_conv + q_rad - q_chem - q_cond;
+    double resid  = q_conv + q_rad - q_cond;   // Tchem diagnostik, NR'de yok
 
     printf("\nYuzey enerji dengesi (kW/m2):\n");
     printf("  q_conv = %+12.3f kW/m2\n", q_conv/1000.0);
