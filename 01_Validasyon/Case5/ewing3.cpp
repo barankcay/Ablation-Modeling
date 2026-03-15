@@ -48,7 +48,7 @@ double inverseAverage(double v1, double d1, double v2, double d2)
 // =============================================================================
 double blowing_factor(double m_dot, double rho_ue_CH0, double& h_eff_out)
 {
-    bf_phi = 2.0 * 0.5 * m_dot / rho_ue_CH0;
+    bf_phi = 2.0 * 1.0 * m_dot / rho_ue_CH0;
 
     if (fabs(bf_phi) < 1e-8)
         bf_Omega = 1.0 - 0.5 * bf_phi;
@@ -237,6 +237,22 @@ void init_pyrogas_table()
 double cp_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.cp, T); }
 double mu_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.mu, T); }
 
+// Piroliz gazi entalpisi: h(T) = integral_T0^T cp(T') dT'  (trapez kuralı)
+// h_g_T referans noktasi: tbl_pg.T[0] (T_ref=200K → h=0)
+static vector<double> h_g_table;
+void init_h_g_table()
+{
+    const int N = (int)tbl_pg.T.size();
+    h_g_table.resize(N, 0.0);
+    for (int i = 1; i < N; i++)
+    {
+        double dT     = tbl_pg.T[i] - tbl_pg.T[i-1];
+        double cp_avg = 0.5*(tbl_pg.cp[i] + tbl_pg.cp[i-1]);
+        h_g_table[i]  = h_g_table[i-1] + cp_avg * dT;
+    }
+}
+double h_g_T(double T) { return interp1_linear(tbl_pg.T, h_g_table, T); }
+
 static const vector<double> Qp_T   = {256, 298, 444, 556, 644, 833,
                                        1111, 1389, 1667, 1944, 2222, 2778, 3333};
 static const vector<double> Qp_val = {-864540, -857000, -827400, -807800, -795200, -778240,
@@ -372,22 +388,22 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
     {
         double Tw    = lookup_Tw(Bg, L);
         double Tchem = lookup_Tchem(Bg, L);
-        double h_w   = cp_g * Tw;   // unity Le: h_w = cp_g * Tw
+        double h_w   = h_g_T(Tw);   // entegre entalpi: h(T) = integral cp dT
 
         double f = (k_surf/dx_surf)*(Tw - T1)
                  - rho_ue_CH*(H_recovery - h_w)
                  - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4))
-                 - rho_ue_CH*Tchem;
+                 + rho_ue_CH*Tchem;
 
         double dL   = 0.01;
         double Tw2  = lookup_Tw(Bg, L + dL);
         double Tc2  = lookup_Tchem(Bg, L + dL);
-        double h_w2 = cp_g * Tw2;
+        double h_w2 = h_g_T(Tw2);
 
         double f2 = (k_surf/dx_surf)*(Tw2 - T1)
                   - rho_ue_CH*(H_recovery - h_w2)
                   - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw2,4))
-                  - rho_ue_CH*Tc2;
+                  + rho_ue_CH*Tc2;
 
         double dfdL = (f2 - f) / dL;
         if (fabs(dfdL) < 1e-30) break;
@@ -516,6 +532,7 @@ int main()
     init_virgin_table();
     init_char_table();
     init_pyrogas_table();
+    init_h_g_table();
     load_bprime_table("bprime_table.txt");
 
     // =========================================================================
@@ -698,7 +715,7 @@ int main()
                           * (P_new[1]-P_new[0]) / dx_surf;
         }
         if (rho_ue_CH_now > 0.0)
-            blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+            blowing_factor(m_dot_surface + Bc_now * rho_ue_CH_now, rho_ue_CH_now, h_eff);
         else
             h_eff = 0.0;
         m_dot_g = m_dot_surface;
@@ -726,7 +743,7 @@ int main()
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
             if (rho_ue_CH_now > 0.0)
-                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+                blowing_factor(m_dot_surface + Bc_now * rho_ue_CH_now, rho_ue_CH_now, h_eff);
             else
                 h_eff = 0.0;
             m_dot_g = m_dot_surface;
@@ -762,7 +779,7 @@ int main()
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
             if (rho_ue_CH_now > 0.0)
-                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+                blowing_factor(m_dot_surface + Bc_now * rho_ue_CH_now, rho_ue_CH_now, h_eff);
             else
                 h_eff = 0.0;
             m_dot_g = m_dot_surface;
@@ -843,12 +860,12 @@ int main()
         if (iter_count > max_iters_used) max_iters_used = iter_count;
 
         // Yuzey enerji dengesi residual (enthalpy-based)
-        double h_w_now   = cp_g_T(T_wall) * T_wall;
+        double h_w_now   = h_g_T(T_wall);
         double q_conv_s  = h_eff * (H_recovery - h_w_now);
         double q_rad_s   = 0.0;   // Case 5: radyasyon yok
         double q_chem_s  = h_eff * lookup_Tchem(Bg_now, L_prev);
         double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
-        double resid_s   = q_conv_s + q_rad_s + q_chem_s - q_cond_s;
+        double resid_s   = q_conv_s + q_rad_s - q_chem_s - q_cond_s;
         double resid_pct_s = (fabs(q_conv_s) > 1e-10) ? (resid_s / q_conv_s) * 100.0 : 0.0;
 
         // =====================================================================
@@ -958,12 +975,12 @@ int main()
     printf("Toplam erime        : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik      : %.4f mm\n", (L_domain-recession_total)*1e3);
 
-    double h_w_f  = cp_g_T(T_wall) * T_wall;
+    double h_w_f  = h_g_T(T_wall);
     double q_conv = h_eff * (H_recovery - h_w_f);
     double q_rad  = 0.0;   // Case 5: radyasyon yok
     double q_chem = h_eff * lookup_Tchem(Bg_now, L_prev);
     double q_cond = k_surf * (T_wall - T_old[1]) / (x[1]-x[0]);
-    double resid  = q_conv + q_rad + q_chem - q_cond;
+    double resid  = q_conv + q_rad - q_chem - q_cond;
 
     printf("\nYuzey enerji dengesi (kW/m2):\n");
     printf("  q_conv = %+12.3f kW/m2\n", q_conv/1000.0);
