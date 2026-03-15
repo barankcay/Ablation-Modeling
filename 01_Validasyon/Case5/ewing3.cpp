@@ -489,7 +489,7 @@ int main()
     const double rho_virgin     = (1.0-phi_v) * rho_intr_v;
     const double rho_char_total = (1.0-phi_c) * rho_intr_c;
 
-    const double T_back  = 300, P_surf = 101325.0, P_back = 101325.0;
+    const double T_back  = 298.0, P_surf = 101325.0, P_back = 101325.0;
 
     // =========================================================================
     // Case 5 SINIR KOSULU PARAMETRELERİ (Ewing 2013, Sec. IV.E)
@@ -579,7 +579,7 @@ int main()
 
         // Case 5: lineer ramp — t <= 0.1s arası 0'dan rho_ue_CH0'a çıkar
         double ramp = (time < t_ramp_end) ? (time / t_ramp_end) : 1.0;
-        double h_eff_unblown = ramp * rho_ue_CH0;   // bu ramplanan HTC
+        double rho_ue_CH_now = ramp * rho_ue_CH0;
 
         alpha_eff_old = alpha_eff;
 
@@ -697,7 +697,10 @@ int main()
                           * (K_surf_tmp/mu_g_T(T_old[0]))
                           * (P_new[1]-P_new[0]) / dx_surf;
         }
-        blowing_factor(m_dot_surface, ramp * rho_ue_CH0, h_eff);
+        if (rho_ue_CH_now > 0.0)
+            blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+        else
+            h_eff = 0.0;
         m_dot_g = m_dot_surface;
 
         // =====================================================================
@@ -722,18 +725,20 @@ int main()
                               * (K_surf2/mu_g_T(T_wall))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            blowing_factor(m_dot_surface, ramp * rho_ue_CH0, h_eff);
+            if (rho_ue_CH_now > 0.0)
+                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+            else
+                h_eff = 0.0;
             m_dot_g = m_dot_surface;
             double T_wall_new = T_wall;
 
             // (a) NR on L — Bg = m_dot_g / rho_ue_CH_now  (enthalpy-based B'g)
             double cp_g_wall = cp_g_T(T_wall);
-            Bg_now = m_dot_g / (ramp * rho_ue_CH0);
+            Bg_now = m_dot_g / rho_ue_CH0;
             if (Bg_now < 0.0) Bg_now = 0.0;
 
-            double emissivity_now = 0;
             double L_cur = solve_L_NR(Bg_now, h_eff, k_surf, T1,
-                                      H_recovery, emissivity_now, sigma_SB,
+                                      H_recovery, 0.0, sigma_SB,
                                       T_surr, dx_surf, cp_g_wall, L_prev);
             L_prev = L_cur;
             T_wall_new = lookup_Tw(Bg_now, L_cur);
@@ -741,7 +746,7 @@ int main()
             Bc_now = lookup_Bc(Bg_now, L_cur);
 
             // sdot = B'c * rho_ue_CH / rho_c  (enthalpy-based, Ewing Eq.52)
-            sdot = Bc_now * h_eff / rho_char_total;
+            sdot = (rho_ue_CH_now > 0.0) ? (Bc_now * h_eff / rho_char_total) : 0.0;
             if (sdot < 0.0) sdot = 0.0;
 
             double sdot_old_iter = sdot_iter;
@@ -756,7 +761,10 @@ int main()
                               * (K_surf2/mu_g_T(T_wall_new))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            blowing_factor(m_dot_surface, ramp * rho_ue_CH0, h_eff);
+            if (rho_ue_CH_now > 0.0)
+                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+            else
+                h_eff = 0.0;
             m_dot_g = m_dot_surface;
 
             // (b) SICAKLIK TDMA
@@ -835,10 +843,9 @@ int main()
         if (iter_count > max_iters_used) max_iters_used = iter_count;
 
         // Yuzey enerji dengesi residual (enthalpy-based)
-        double eps_now   = eps_surf(T_wall, alpha_eff[0]);
         double h_w_now   = cp_g_T(T_wall) * T_wall;
         double q_conv_s  = h_eff * (H_recovery - h_w_now);
-        double q_rad_s   = 0;
+        double q_rad_s   = 0.0;   // Case 5: radyasyon yok
         double q_chem_s  = h_eff * lookup_Tchem(Bg_now, L_prev);
         double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
         double resid_s   = q_conv_s + q_rad_s + q_chem_s - q_cond_s;
@@ -951,10 +958,9 @@ int main()
     printf("Toplam erime        : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik      : %.4f mm\n", (L_domain-recession_total)*1e3);
 
-    double eps_f  = eps_surf(T_wall, alpha_eff[0]);
     double h_w_f  = cp_g_T(T_wall) * T_wall;
     double q_conv = h_eff * (H_recovery - h_w_f);
-    double q_rad  = eps_f * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
+    double q_rad  = 0.0;   // Case 5: radyasyon yok
     double q_chem = h_eff * lookup_Tchem(Bg_now, L_prev);
     double q_cond = k_surf * (T_wall - T_old[1]) / (x[1]-x[0]);
     double resid  = q_conv + q_rad + q_chem - q_cond;
