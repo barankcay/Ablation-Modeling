@@ -48,7 +48,7 @@ double inverseAverage(double v1, double d1, double v2, double d2)
 // =============================================================================
 double blowing_factor(double m_dot, double rho_ue_CH0, double& h_eff_out)
 {
-    bf_phi = 2.0 * 1.0 * m_dot / rho_ue_CH0;
+    bf_phi = 2.0 * 0.5 * m_dot / rho_ue_CH0;   // lambda=0.5, Kays-Crawford (Ewing 2013)
 
     if (fabs(bf_phi) < 1e-8)
         bf_Omega = 1.0 - 0.5 * bf_phi;
