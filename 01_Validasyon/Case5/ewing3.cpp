@@ -457,7 +457,7 @@ int main()
     const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
-    const int    N_nodes  = 1001;
+    const int    N_nodes  = 501;
     const double L_domain = 0.05;
 
     vector<double> x(N_nodes);
