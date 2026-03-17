@@ -846,7 +846,7 @@ int main()
         // Yuzey enerji dengesi residual (enthalpy-based)
         double h_w_now   = cp_g_T(T_wall) * T_wall;
         double q_conv_s  = h_eff * (H_recovery - h_w_now);
-        double q_rad_s   = eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
+        double q_rad_s   = -eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
         double q_chem_s  = h_eff * lookup_Tchem(Bg_now, L_prev);
         double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
         double resid_s   = q_conv_s + q_rad_s + q_chem_s - q_cond_s;
@@ -949,7 +949,7 @@ int main()
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
     printf("Final Twall         : %.2f K\n", T_wall);
-    printf("Final T[1]          : %.2f K\n", T_old[1]);
+    printf("Final T[1]          : %.2f K\n", T_old[300]);
     printf("Final P[0]          : %.3f kPa\n", P_old[0]/1000.0);
     printf("Final mdot          : %.3e kg/m2s\n", m_dot_surface);
     printf("Final rho_ue_CH_eff : %.4f kg/m2s\n", h_eff);
@@ -961,7 +961,7 @@ int main()
 
     double h_w_f  = cp_g_T(T_wall) * T_wall;
     double q_conv = h_eff * (H_recovery - h_w_f);
-    double q_rad  = eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
+    double q_rad  = -eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
     double q_chem = h_eff * lookup_Tchem(Bg_now, L_prev);
     double q_cond = k_surf * (T_wall - T_old[1]) / (x[1]-x[0]);
     double resid  = q_conv + q_rad + q_chem - q_cond;
