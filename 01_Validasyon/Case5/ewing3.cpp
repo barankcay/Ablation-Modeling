@@ -443,7 +443,7 @@ int main()
     const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
-    const int    N_nodes  = 701;
+    const int    N_nodes  = 1001;
     const double L_domain = 0.05;
 
     vector<double> x(N_nodes);
@@ -457,7 +457,7 @@ int main()
 
     const double Gamma  = 0.5;
     const double R_univ = 8314.0;
-    const double MW_air = 28.97;
+    const double MW_air = 28.9645;
     const double R_air  = R_univ / MW_air;
 
     const double T_reac[3] = {333.3, 555.6, 5556.0};
@@ -540,7 +540,7 @@ int main()
     // =========================================================================
     ofstream fout("ablation_history.csv");
     fout << "time,Twall,T1,P0,mdot,rho_ue_CH,sdot_mm_s,recession_mm,thickness_mm,"
-            "Bg,Bc,L_nr,eps_surf,k_surf,iter,converged,resid_pct\n";
+            "Bg,Bc,L_nr,eps_surf,k_surf,iter,converged,resid_pct,mdot_g,mdot_c,T_24mm\n";
 
     const int save_every = 2;
 
@@ -574,6 +574,7 @@ int main()
     // =========================================================================
     for (int n = 1; n <= nstep; n++)
     {
+        
         double time    = n * dt;
         double dx_surf = x[1] - x[0];
 
@@ -697,6 +698,7 @@ int main()
                           * (K_surf_tmp/mu_g_T(T_old[0]))
                           * (P_new[1]-P_new[0]) / dx_surf;
         }
+        // m_dot_surface*=10.0;  // Case 5'te ilk iterasyonda HTC çok düşük geliyor, ramp etkisiyle uyumlu olması için 10x artırarak başlatıyorum  
         if (rho_ue_CH_now > 0.0)
             blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
         else
@@ -903,6 +905,37 @@ int main()
         }
 
         // =====================================================================
+        // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
+        // =====================================================================
+        double mdot_g_total = 0.0;
+        for (int i = 0; i < N_nodes; i++)
+        {
+            double dx_i;
+            if (i == 0)
+                dx_i = 0.5*(x[1] - x[0]);
+            else if (i == N_nodes-1)
+                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
+            else
+                dx_i = 0.5*(x[i+1] - x[i-1]);
+            mdot_g_total += drho_dt[i] * dx_i;
+        }
+        double mdot_c_out = Bc_now * h_eff;   // [kg/m2/s]
+
+        // 24mm'deki sicaklik — malzeme koordinatinda sabit nokta
+        // x[0] = yuzey (kayiyor), 24mm orijinal derinlik
+        // En yakin nodu bul
+        double T_24mm = T_new[0];
+        {
+            double target = 0.024;
+            double best = 1e99;
+            for (int i = 0; i < N_nodes; i++)
+            {
+                double dist = fabs(x[i] - target);
+                if (dist < best) { best = dist; T_24mm = T_new[i]; }
+            }
+        }
+
+        // =====================================================================
         // 8. UPDATE
         // =====================================================================
         T_prev        = T_old;
@@ -926,22 +959,23 @@ int main()
                  << eps_surf(T_wall, alpha_eff[0]) << "," << k_surf << ","
                  << iter_count << ","
                  << (iter_converged ? 1 : 0) << ","
-                 << resid_pct_s << "\n";
+                 << resid_pct_s << ","
+                 << mdot_g_total << "," << mdot_c_out << "," << T_24mm << "\n";
         }
-        if ((n % (save_every*10)) == 0 || n == 1 || n == nstep)
-        {
-            printf("t=%7.1fs | Tw=%7.1fK | T1=%7.1fK | rho_ue_CH=%6.4f | "
-                   "Bg=%.3f Bc=%.4f L=%5.2f eps=%.3f k=%.3f | "
-                   "sdot=%7.4fmm/s | erim=%7.4fmm | "
-                   "it=%d %s | resid=%+.3f%%\n",
-                   time, T_wall, T_old[1], h_eff,
-                   Bg_now, Bc_now, L_prev,
-                   eps_surf(T_wall, alpha_eff[0]), k_surf,
-                   sdot*1e3, recession_total*1e3,
-                   iter_count,
-                   iter_converged ? "[CONV]" : "[WARN:MAX_ITER]",
-                   resid_pct_s);
-        }
+        // if ((n % (save_every*10)) == 0 || n == 1 || n == nstep)
+        // {
+        //     printf("t=%7.1fs | Tw=%7.1fK | T1=%7.1fK | rho_ue_CH=%6.4f | "
+        //            "Bg=%.3f Bc=%.4f L=%5.2f eps=%.3f k=%.3f | "
+        //            "sdot=%7.4fmm/s | erim=%7.4fmm | "
+        //            "it=%d %s | resid=%+.3f%%\n",
+        //            time, T_wall, T_old[1], h_eff,
+        //            Bg_now, Bc_now, L_prev,
+        //            eps_surf(T_wall, alpha_eff[0]), k_surf,
+        //            sdot*1e3, recession_total*1e3,
+        //            iter_count,
+        //            iter_converged ? "[CONV]" : "[WARN:MAX_ITER]",
+        //            resid_pct_s);
+        // }
     }
 
     fout.close();
@@ -949,7 +983,7 @@ int main()
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
     printf("Final Twall         : %.2f K\n", T_wall);
-    printf("Final T[1]          : %.2f K\n", T_old[300]);
+    printf("Final T[1]          : %.2f K\n", T_old[1]);
     printf("Final P[0]          : %.3f kPa\n", P_old[0]/1000.0);
     printf("Final mdot          : %.3e kg/m2s\n", m_dot_surface);
     printf("Final rho_ue_CH_eff : %.4f kg/m2s\n", h_eff);
@@ -989,6 +1023,7 @@ int main()
     else
         printf("  Sonuc: DIKKAT — %d adimda yakinsama saglanamadi!\n", n_not_converged);
     printf("%s\n", string(80, '=').c_str());
+    double dx_surf = x[1] - x[0];
 
     return 0;
 }
