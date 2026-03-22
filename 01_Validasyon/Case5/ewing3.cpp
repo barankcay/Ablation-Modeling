@@ -456,9 +456,9 @@ int main()
     vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
 
     const double Gamma  = 0.5;
-    const double R_univ = 8314.0;
-    const double MW_air = 28.9645;
-    const double R_air  = R_univ / MW_air;
+    const double R_univ = 8314.0; //J/kmol/K
+    const double MW_air = 28.851; //kg/kmol 
+    const double R_air  = R_univ / MW_air; // J/kg/K
 
     const double T_reac[3] = {333.3, 555.6, 5556.0};
 
@@ -917,7 +917,7 @@ int main()
                 dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
             else
                 dx_i = 0.5*(x[i+1] - x[i-1]);
-            mdot_g_total += drho_dt[i] * dx_i;
+            mdot_g_total += (-drho_dt[i] * dx_i);
         }
         double mdot_c_out = Bc_now * h_eff;   // [kg/m2/s]
 
