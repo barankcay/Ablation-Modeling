@@ -495,7 +495,7 @@ int main()
     // Case 5 SINIR KOSULU PARAMETRELERİ (Ewing 2013, Sec. IV.E)
     // =========================================================================
     const double rho_ue_CH0 = 0.3;        // enthalpy-based HTC [kg/m2/s], blowing yokken
-    const double H_recovery = 2.15e7;     // recovery enthalpy [J/kg]  (Case 2.3)
+    const double H_recovery = 2.5e7;      // recovery enthalpy [J/kg]
     const double t_ramp_end = 0.1;        // HTC ramp süresi [s]: 0 -> rho_ue_CH0 lineer
 
     const double sigma_SB = 5.67e-8;
@@ -627,9 +627,11 @@ int main()
 
             double phi_i = phi_v*(1.0-alpha_eff[i]) + phi_c*alpha_eff[i];
             drho_dt[i] = 0.0;
-            for (int c = 0; c < N_comp; c++)
-                drho_dt[i] += (rho_v_comp[c]-rho_c_comp[c])
+            for (int c = 0; c < N_comp; c++) {
+                double w = (c < 2) ? Gamma : (1.0 - Gamma);
+                drho_dt[i] += w * (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
+            }
             drho_dt[i] *= (1.0 - phi_i);
             k_node[i] = k_mix(T_old[i], alpha_eff[i]);
         }
