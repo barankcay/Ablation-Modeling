@@ -372,11 +372,11 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
     {
         double Tw    = lookup_Tw(Bg, L);
         double Tchem = lookup_Tchem(Bg, L);
-        double h_w   = cp_g * Tw;   // cp_g = solid material cp (cp_mix at wall)
+        double h_w   = cp_g * Tw;   // unity Le: h_w = cp_g * Tw
 
         double f = (k_surf/dx_surf)*(Tw - T1)
                  - rho_ue_CH*(H_recovery - h_w)
-                 - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4))
+                 + emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4))
                  - rho_ue_CH*Tchem;
 
         double dL   = 0.01;
@@ -386,7 +386,7 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
 
         double f2 = (k_surf/dx_surf)*(Tw2 - T1)
                   - rho_ue_CH*(H_recovery - h_w2)
-                  - emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw2,4))
+                  + emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw2,4))
                   - rho_ue_CH*Tc2;
 
         double dfdL = (f2 - f) / dL;
@@ -627,11 +627,10 @@ int main()
 
             double phi_i = phi_v*(1.0-alpha_eff[i]) + phi_c*alpha_eff[i];
             drho_dt[i] = 0.0;
-            for (int c = 0; c < N_comp; c++) {
-                double w = (c < 2) ? Gamma : (1.0 - Gamma);
-                drho_dt[i] += w * (rho_v_comp[c]-rho_c_comp[c])
+            double weight[3] = {Gamma, Gamma, 1.0-Gamma};
+            for (int c = 0; c < N_comp; c++)
+                drho_dt[i] += weight[c] * (rho_v_comp[c]-rho_c_comp[c])
                             * (alpha_new[c][i]-alpha_old[c][i]) / dt;
-            }
             drho_dt[i] *= (1.0 - phi_i);
             k_node[i] = k_mix(T_old[i], alpha_eff[i]);
         }
@@ -737,8 +736,7 @@ int main()
             double T_wall_new = T_wall;
 
             // (a) NR on L — Bg = m_dot_g / rho_ue_CH_now  (enthalpy-based B'g)
-            // Use solid material cp for h_w = cp * Tw in the energy balance
-            double cp_g_wall = cp_mix(T_wall, alpha_eff[0]);
+            double cp_g_wall = cp_g_T(T_wall);
             Bg_now = m_dot_g / rho_ue_CH0;
             if (Bg_now < 0.0) Bg_now = 0.0;
 
@@ -849,12 +847,12 @@ int main()
         if (iter_count > max_iters_used) max_iters_used = iter_count;
 
         // Yuzey enerji dengesi residual (enthalpy-based)
-        double h_w_now   = cp_mix(T_wall, alpha_eff[0]) * T_wall;
+        double h_w_now   = cp_g_T(T_wall) * T_wall;
         double q_conv_s  = h_eff * (H_recovery - h_w_now);
-        double q_rad_s   = eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_wall,4) - pow(T_surr,4));
+        double q_rad_s   = -eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
         double q_chem_s  = h_eff * lookup_Tchem(Bg_now, L_prev);
         double q_cond_s  = k_surf * (T_wall - T_new[1]) / (x[1] - x[0]);
-        double resid_s   = q_conv_s - q_rad_s + q_chem_s - q_cond_s;
+        double resid_s   = q_conv_s + q_rad_s + q_chem_s - q_cond_s;
         double resid_pct_s = (fabs(q_conv_s) > 1e-10) ? (resid_s / q_conv_s) * 100.0 : 0.0;
 
         // =====================================================================
@@ -996,12 +994,12 @@ int main()
     printf("Toplam erime        : %.4f mm\n", recession_total*1e3);
     printf("Kalan kalinlik      : %.4f mm\n", (L_domain-recession_total)*1e3);
 
-    double h_w_f  = cp_mix(T_wall, alpha_eff[0]) * T_wall;
+    double h_w_f  = cp_g_T(T_wall) * T_wall;
     double q_conv = h_eff * (H_recovery - h_w_f);
-    double q_rad  = eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_wall,4) - pow(T_surr,4));
+    double q_rad  = -eps_surf(T_wall, alpha_eff[0]) * sigma_SB * (pow(T_surr,4) - pow(T_wall,4));
     double q_chem = h_eff * lookup_Tchem(Bg_now, L_prev);
     double q_cond = k_surf * (T_wall - T_old[1]) / (x[1]-x[0]);
-    double resid  = q_conv - q_rad + q_chem - q_cond;
+    double resid  = q_conv + q_rad + q_chem - q_cond;
 
     printf("\nYuzey enerji dengesi (kW/m2):\n");
     printf("  q_conv = %+12.3f kW/m2\n", q_conv/1000.0);
