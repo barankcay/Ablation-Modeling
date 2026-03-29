@@ -375,7 +375,7 @@ double solve_L_NR(double Bg, double rho_ue_CH, double k_surf,
         double h_w   = cp_g * Tw;   // unity Le: h_w = cp_g * Tw
 
         double f = (k_surf/dx_surf)*(Tw - T1)
-                 - rho_ue_CH*(H_recovery - h_w)
+                  - rho_ue_CH*(H_recovery - h_w)
                  + emissivity*sigma_SB*(pow(T_surr,4) - pow(Tw,4))
                  - rho_ue_CH*Tchem;
 
