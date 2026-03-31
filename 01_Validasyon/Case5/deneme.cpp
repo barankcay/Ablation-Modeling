@@ -46,7 +46,7 @@ double inverseAverage(double v1, double d1, double v2, double d2)
 // Omega = phi / (exp(phi) - 1)
 // h_eff_out = Omega * rho_ue_CH   [kg/m2/s * J/kg = W/m2, enthalpy-based]
 // =============================================================================
-double blowing_factor(double m_dot, double rho_ue_CH0, double& h_eff_out)
+double blowing_factor(double m_dot, double rho_ue_CH0, double& h_eff_out) //BU KISIM İNCELENMELİ DİKKATLİCE
 {
     bf_phi = 2.0 * 0.5 * m_dot / rho_ue_CH0;
 
@@ -168,8 +168,8 @@ double k_v_T (double T) { return interp1_linear(tbl_v.T, tbl_v.k,  T); }
 double cp_c_T(double T) { return interp1_linear(tbl_c.T, tbl_c.cp, T); }
 double k_c_T (double T) { return interp1_linear(tbl_c.T, tbl_c.k,  T); }
 
-double cp_mix(double T, double a) { return cp_v_T(T)*(1.0-a) + cp_c_T(T)*a; }
-double k_mix (double T, double a) { return k_v_T(T) *(1.0-a) + k_c_T(T) *a; }
+double cp_mix(double T, double a) { return cp_v_T(T)*(1-a) + cp_c_T(T)*a; }
+double k_mix (double T, double a) { return k_v_T(T) *(1-a) + k_c_T(T) *(a); }
 
 double eps_surf(double T, double a)
 {
@@ -518,11 +518,12 @@ double solve_L_NR(double Bg,
         double T_surr     = 300.0;
         // Eq. 87
         double Tchem = (-1.0 - Bp) * hw  +  Bc * hc  +  Bg * hg;
+        // cout<<rho_ue_CH * (H_r + Tchem)<<" "<<1*emissivity * sigma_SB * (pow(Tw, 4.0) - pow(T_surr, 4.0))<<" "<<(k_surf / dx_surf) * (Tw - T1)<<endl;
 
         // Eq. 86 residual
         // Eq. 86 residual
         return rho_ue_CH * (H_r + Tchem)
-            - emissivity * sigma_SB * (pow(Tw, 4.0) - pow(T_surr, 4.0))
+            - 1*emissivity * sigma_SB * (pow(Tw, 4.0) - pow(T_surr, 4.0))
             - (k_surf / dx_surf) * (Tw - T1);
     };
 
@@ -580,7 +581,7 @@ int main()
     // PARAMETRELER
     // =========================================================================
     const double t_end = 60.0;
-    const double dt    = 0.001;
+    const double dt    = 0.01;
     const int    nstep = (int)round(t_end / dt);
 
     const int    N_nodes  = 1001;
@@ -597,7 +598,7 @@ int main()
 
     const double Gamma  = 0.5;
     const double R_univ = 8314.0; //J/kmol/K
-    const double MW_air = 28.851; //kg/kmol 
+    const double MW_air = 17; //kg/kmol 
     const double R_air  = R_univ / MW_air; // J/kg/K
 
     const double T_reac[3] = {333.3, 555.6, 5556.0};
@@ -638,7 +639,7 @@ int main()
     const double H_recovery = 2.5e7;      // recovery enthalpy [J/kg]
     const double t_ramp_end = 0.1;        // HTC ramp süresi [s]: 0 -> rho_ue_CH0 lineer
 
-    const double sigma_SB = 5.67e-8;
+    const double sigma_SB =5.670374419e-8;
     const double T_surr   = 300.0;
 
     const int    max_iter = 400;
@@ -702,7 +703,7 @@ int main()
     vector<double> T_new(N_nodes);
 
     double sdot   = 0.0;
-    double L_prev = 1.0;
+    double L_prev = 0;
     double Bg_now = 0.0, Bc_now = 0.0;
 
     int n_converged     = 0;
@@ -714,6 +715,7 @@ int main()
     // =========================================================================
     for (int n = 1; n <= nstep; n++)
     {
+
         
         double time    = n * dt;
         double dx_surf = x[1] - x[0];
@@ -721,7 +723,22 @@ int main()
         // Case 5: lineer ramp — t <= 0.1s arası 0'dan rho_ue_CH0'a çıkar
         double ramp = (time < t_ramp_end) ? (time / t_ramp_end) : 1.0;
         double rho_ue_CH_now = ramp * rho_ue_CH0;
-
+        // =====================================================================
+        // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
+        // =====================================================================
+        double mdot_g_total = 0.0;
+        for (int i = 0; i < N_nodes; i++)
+        {
+            double dx_i;
+            if (i == 0)
+                dx_i = 0.5*(x[1] - x[0]);
+            else if (i == N_nodes-1)
+                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
+            else
+                dx_i = 0.5*(x[i+1] - x[i-1]);
+            mdot_g_total += (-drho_dt[i] * dx_i);
+        }
+        double mdot_c_out = Bc_now * rho_ue_CH_now;   // [kg/m2/s]
         alpha_eff_old = alpha_eff;
 
         // =====================================================================
@@ -840,10 +857,10 @@ int main()
                           * (P_new[1]-P_new[0]) / dx_surf;
         }
         // m_dot_surface*=10.0;  // Case 5'te ilk iterasyonda HTC çok düşük geliyor, ramp etkisiyle uyumlu olması için 10x artırarak başlatıyorum  
-        if (rho_ue_CH_now > 0.0)
-            blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
-        else
-            h_eff = 0.0;
+        // if (rho_ue_CH_now > 0.0)
+        //     blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+        // else
+        //     h_eff = 0.0;
         m_dot_g = m_dot_surface;
 
         // =====================================================================
@@ -868,11 +885,12 @@ int main()
                               * (K_surf2/mu_g_T(T_wall))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            if (rho_ue_CH_now > 0.0)
-                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
-            else
-                h_eff = 0.0;
+            // if (rho_ue_CH_now > 0.0)
+            //     blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
+            // else
+            //     h_eff = 0.0;
             m_dot_g = m_dot_surface;
+            cout<<mdot_g_total<<endl;
             double T_wall_new = T_wall;
 
             // (a) NR on L — Bg = m_dot_g / rho_ue_CH_now  (enthalpy-based B'g)
@@ -881,7 +899,7 @@ int main()
             if (Bg_now < 0.0) Bg_now = 0.0;
 
             double emissivity_now = eps_surf(T_wall, alpha_eff[0]);
-            double L_cur = solve_L_NR(Bg_now, h_eff, H_recovery,
+            double L_cur = solve_L_NR(Bg_now, rho_ue_CH_now, H_recovery,
                                     k_surf, dx_surf, T1,
                                     emissivity_now,
                                     1.0,    // alpha_w — gray body
@@ -894,7 +912,7 @@ int main()
             Bc_now = lookup_Bc(Bg_now, L_cur);
 
             // sdot = B'c * rho_ue_CH / rho_c  (enthalpy-based, Ewing Eq.52)
-            sdot = (rho_ue_CH_now > 0.0) ? (Bc_now * h_eff / rho_char_total) : 0.0;
+            sdot = (rho_ue_CH_now > 0.0) ? (Bc_now * rho_ue_CH_now / rho_char_total) : 0.0;
             if (sdot < 0.0) sdot = 0.0;
 
             double sdot_old_iter = sdot_iter;
@@ -1056,22 +1074,7 @@ int main()
             k_surf = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
         }
 
-        // =====================================================================
-        // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
-        // =====================================================================
-        double mdot_g_total = 0.0;
-        for (int i = 0; i < N_nodes; i++)
-        {
-            double dx_i;
-            if (i == 0)
-                dx_i = 0.5*(x[1] - x[0]);
-            else if (i == N_nodes-1)
-                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
-            else
-                dx_i = 0.5*(x[i+1] - x[i-1]);
-            mdot_g_total += (-drho_dt[i] * dx_i);
-        }
-        double mdot_c_out = Bc_now * h_eff;   // [kg/m2/s]
+
 
         // 24mm'deki sicaklik — malzeme koordinatinda sabit nokta
         // x[0] = yuzey (kayiyor), 24mm orijinal derinlik
@@ -1138,7 +1141,7 @@ int main()
     printf("Final T[1]          : %.2f K\n", T_old[1]);
     printf("Final P[0]          : %.3f kPa\n", P_old[0]/1000.0);
     printf("Final mdot          : %.3e kg/m2s\n", m_dot_surface);
-    printf("Final rho_ue_CH_eff : %.4f kg/m2s\n", h_eff);
+    printf("Final rho_ue_CH_eff : %.4f kg/m2s\n", "dikkat!");
     printf("Final s_dot         : %.4f mm/s\n", sdot*1e3);
     printf("Final Bg            : %.4f\n", Bg_now);
     printf("Final Bc            : %.4f\n", Bc_now);

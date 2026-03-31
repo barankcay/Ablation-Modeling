@@ -495,7 +495,7 @@ int main()
     // Case 5 SINIR KOSULU PARAMETRELERİ (Ewing 2013, Sec. IV.E)
     // =========================================================================
     const double rho_ue_CH0 = 0.3;        // enthalpy-based HTC [kg/m2/s], blowing yokken
-    const double H_recovery = 2.5e7;      // recovery enthalpy [J/kg]
+    const double H_recovery = 1.5e6;      // recovery enthalpy [J/kg]
     const double t_ramp_end = 0.1;        // HTC ramp süresi [s]: 0 -> rho_ue_CH0 lineer
 
     const double sigma_SB = 5.67e-8;
@@ -574,6 +574,22 @@ int main()
     // =========================================================================
     for (int n = 1; n <= nstep; n++)
     {
+        
+        // =====================================================================
+        // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
+        // =====================================================================
+        double mdot_g_total = 0.0;
+        for (int i = 0; i < N_nodes; i++)
+        {
+            double dx_i;
+            if (i == 0)
+                dx_i = 0.5*(x[1] - x[0]);
+            else if (i == N_nodes-1)
+                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
+            else
+                dx_i = 0.5*(x[i+1] - x[i-1]);
+            mdot_g_total += (-drho_dt[i] * dx_i);
+        }
         
         double time    = n * dt;
         double dx_surf = x[1] - x[0];
@@ -905,21 +921,6 @@ int main()
             k_surf = 2.0*k_node[0]*k_node[1] / (k_node[0]+k_node[1]);
         }
 
-        // =====================================================================
-        // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
-        // =====================================================================
-        double mdot_g_total = 0.0;
-        for (int i = 0; i < N_nodes; i++)
-        {
-            double dx_i;
-            if (i == 0)
-                dx_i = 0.5*(x[1] - x[0]);
-            else if (i == N_nodes-1)
-                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
-            else
-                dx_i = 0.5*(x[i+1] - x[i-1]);
-            mdot_g_total += (-drho_dt[i] * dx_i);
-        }
         double mdot_c_out = Bc_now * h_eff;   // [kg/m2/s]
 
         // 24mm'deki sicaklik — malzeme koordinatinda sabit nokta
