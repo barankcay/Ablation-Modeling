@@ -572,7 +572,7 @@ double solve_Tw_NR(double Bg,
     const double dTw   = 1.0;      // finite-diff adimi [K]
     const double Tw_min = 300.0;
     const double Tw_max = 4000.0;
-    double Tw = max(Tw_min, min(Tw_max, Tw_guess));
+    double Tw = Tw_guess;
 
     auto eval_f = [&](double Twx) -> double
     {
@@ -735,7 +735,7 @@ int main()
     double T_wall        = T_old[0];
     double m_dot_g       = 0.0;
     double k_surf;
-    double h_eff         = 0.0;   // blowing-corrected rho_ue_CH [kg/m2/s]
+    double h_eff         = rho_ue_CH0;   // blowing-corrected rho_ue_CH [kg/m2/s]
     double m_dot_surface = 0.0;
 
     // =========================================================================
