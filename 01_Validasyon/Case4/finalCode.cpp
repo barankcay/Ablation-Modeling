@@ -732,7 +732,7 @@ int main()
 
     double recession_total = 0.0;
 
-    double T_wall        = 1664;
+    double T_wall        = 1644;
     double m_dot_g       = 0.0;
     double k_surf;
     double h_eff         = rho_ue_CH0;   // blowing-corrected rho_ue_CH [kg/m2/s]
@@ -925,7 +925,7 @@ int main()
         // 5. BLOWING (ilk tahmin)
         // =====================================================================
         {
-            T_old[0]=1664.0;
+            T_old[0]=1644.0;
             double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
             double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
             double K_surf_tmp = 2.0*K_0*K_1 / (K_0 + K_1);
@@ -959,9 +959,9 @@ int main()
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                double R_air=R_univ /MW_g_T(1664.0);
-                m_dot_surface = (P_new[0]/(R_air*1664.0))
-                              * (K_surf2/mu_g_T(1664.0))
+                double R_air=R_univ /MW_g_T(1644.0);
+                m_dot_surface = (P_new[0]/(R_air*1644.0))
+                              * (K_surf2/mu_g_T(1644.0))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
             // if (rho_ue_CH_now > 0.0)
@@ -989,7 +989,7 @@ int main()
                                      k_surf, dx_surf, T1,
                                      emissivity_now, sigma_SB, T_surr,
                                      T_wall);
-            T_wall_new=1664.0;
+            T_wall_new=1644.0;
             Bc_now = lookup_Bc(Bg_now, T_wall_new);
 
             // sdot = B'c * rho_ue_CH / rho_c  (enthalpy-based, Ewing Eq.52)
@@ -1003,17 +1003,17 @@ int main()
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                double R_air=R_univ /MW_g_T(1664.0);
-                m_dot_surface = (P_new[0]/(R_air*1664.0))
-                              * (K_surf2/mu_g_T(1664.0))
+                double R_air=R_univ /MW_g_T(1644.0);
+                m_dot_surface = (P_new[0]/(R_air*1644.0))
+                              * (K_surf2/mu_g_T(1644.0))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            T_old[0]=1664.0;
+            T_old[0]=1644.0;
             // (b) SICAKLIK TDMA
             for (int i = 0; i < N_nodes; i++)
                 a_T[i] = b_T[i] = c_T[i] = d_T[i] = 0.0;
 
-            a_T[0] = 1.0; d_T[0] = 1664;
+            a_T[0] = 1.0; d_T[0] = 1644;
 
             for (int i = 1; i < N_nodes-1; i++)
             {
@@ -1092,7 +1092,7 @@ int main()
             double dT1    = fabs(T1_new   - T1);
             double dsdot  = fabs(sdot_iter - sdot_old_iter);
 
-            T_wall = 1664.0;
+            T_wall = 1644.0;
             T1     = T1_new;
 
             if (dT1 < eps_T && dsdot < eps_sdot) break;
@@ -1203,7 +1203,7 @@ int main()
 
         for (int i = 0; i < N_nodes-1; i++)
         {
-            if (alpha_eff[i] >= 0.98 && alpha_eff[i+1] < 0.98)
+            if (rho_solid_new[i] >= 0.98 && alpha_eff[i+1] < 0.98)
             {
                 double a1 = alpha_eff[i];
                 double a2 = alpha_eff[i+1];
