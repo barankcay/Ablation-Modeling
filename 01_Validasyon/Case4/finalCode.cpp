@@ -1057,14 +1057,15 @@ int main()
                 double hbar_i = (rho_virgin*hv_i - rho_char_total*hc_i)
                             / (rho_virgin - rho_char_total);
                 // Volkan Eq.2.5-2.6: S_pyr = -drho_dt * (hg - hbar)
-                t_Spyro = -drho_dt[i] * (hg_i - hbar_i);
-                // t_Spyro=-(-(hg_i - hbar_i)-hstar_i+hg_i)*(rho_virgin - rho_char_total) * d_alpha_eff_dt;
+                // t_Spyro = -drho_dt[i] * (hg_i - hbar_i);
+                t_Spyro=(-(hg_i - hbar_i)-hstar_i+hg_i)*(rho_virgin - rho_char_total) * d_alpha_eff_dt;
                 t_Stotal = t_Spyro + t_mdotgas*t_hgrad;
 
                 a_T[i] = t_atime + t_ae + t_aw;
                 b_T[i] = t_ae;
                 c_T[i] = t_aw;
                 d_T[i] = t_Stotal*t_dxi + t_atime*T_old[i];
+                
             }
 
             // Arka yuzey: adiabatik
@@ -1170,6 +1171,7 @@ int main()
 
 
 
+
         // 24mm'deki sicaklik — malzeme koordinatinda sabit nokta
         // x[0] = yuzey (kayiyor), 24mm orijinal derinlik
         // En yakin nodu bul
@@ -1230,7 +1232,7 @@ int main()
         }
         fout3 << time << "," << x_char_front << "," << x_pyro_front << "\n";
 
-        fout2 << time << "," << x[160] << "," << T_old[160] << "\n";  // mevcut satır
+        fout2 << time << "," << x[80] << "," << T_old[80] << "\n";  // mevcut satır
 
         if ((n % (save_every*10) == 0 || n == 1 || n == nstep))
         {
@@ -1262,7 +1264,6 @@ int main()
     }
 
     fout.close();
-
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
     printf("Final Twall         : %.2f K\n", T_wall);
