@@ -130,37 +130,37 @@ static void push_row_thermal(ThermalTable& tbl, double T, double cp, double k, d
 void init_virgin_table()
 {
     tbl_v = ThermalTable{};
-    push_row_thermal(tbl_v, 256,  879, 0.398, 0.8);
-    push_row_thermal(tbl_v, 298,  984, 0.403, 0.8);
-    push_row_thermal(tbl_v, 444, 1300, 0.416, 0.8);
-    push_row_thermal(tbl_v, 556, 1470, 0.453, 0.8);
-    push_row_thermal(tbl_v, 644, 1570, 0.470, 0.8);
-    push_row_thermal(tbl_v, 833, 1720, 0.486, 0.8);
-    push_row_thermal(tbl_v, 1111,1860, 0.523, 0.8);
-    push_row_thermal(tbl_v, 1389,1930, 0.560, 0.8);
-    push_row_thermal(tbl_v, 1667,1980, 0.698, 0.8);
-    push_row_thermal(tbl_v, 1944,1990, 0.872, 0.8);
-    push_row_thermal(tbl_v, 2222,2000, 1.110, 0.8);
-    push_row_thermal(tbl_v, 2778,2010, 1.750, 0.8);
-    push_row_thermal(tbl_v, 3333,2010, 2.780, 0.8);
+    push_row_thermal(tbl_v, 256,  879.2, 0.3975, 0.8);
+    push_row_thermal(tbl_v, 298,  983.9, 0.4025, 0.8);
+    push_row_thermal(tbl_v, 444, 1298, 0.4162, 0.8);
+    push_row_thermal(tbl_v, 556, 1465, 0.453, 0.8);
+    push_row_thermal(tbl_v, 644, 1570, 0.4698, 0.8);
+    push_row_thermal(tbl_v, 833, 1717, 0.486, 0.8);
+    push_row_thermal(tbl_v, 1111,1863, 0.5234, 0.8);
+    push_row_thermal(tbl_v, 1389,1934, 0.5601, 0.8);
+    push_row_thermal(tbl_v, 1667,1980, 0.6978, 0.8);
+    push_row_thermal(tbl_v, 1944,1989, 0.8723, 0.8);
+    push_row_thermal(tbl_v, 2222,2001, 1.109, 0.8);
+    push_row_thermal(tbl_v, 2778,2010, 1.751, 0.8);
+    push_row_thermal(tbl_v, 3333,2010, 2.779, 0.8);
 }
 
 void init_char_table()
 {
     tbl_c = ThermalTable{};
-    push_row_thermal(tbl_c, 256,  733, 0.398, 0.9);
-    push_row_thermal(tbl_c, 298,  783, 0.403, 0.9);
-    push_row_thermal(tbl_c, 444, 1090, 0.416, 0.9);
-    push_row_thermal(tbl_c, 556, 1320, 0.453, 0.9);
-    push_row_thermal(tbl_c, 644, 1430, 0.470, 0.9);
-    push_row_thermal(tbl_c, 833, 1680, 0.486, 0.9);
-    push_row_thermal(tbl_c, 1111,1840, 0.523, 0.9);
-    push_row_thermal(tbl_c, 1389,1970, 0.560, 0.9);
-    push_row_thermal(tbl_c, 1667,2050, 0.605, 0.9);
-    push_row_thermal(tbl_c, 1944,2090, 0.729, 0.9);
-    push_row_thermal(tbl_c, 2222,2110, 0.922, 0.9);
-    push_row_thermal(tbl_c, 2778,2140, 1.460, 0.9);
-    push_row_thermal(tbl_c, 3333,2150, 2.320, 0.9);
+    push_row_thermal(tbl_c, 256,  7327, 0.3975, 0.9);
+    push_row_thermal(tbl_c, 298,  7829, 0.4025, 0.9);
+    push_row_thermal(tbl_c, 444, 1093, 0.4162, 0.9);
+    push_row_thermal(tbl_c, 556, 1319, 0.453, 0.9);
+    push_row_thermal(tbl_c, 644, 1432, 0.4698, 0.9);
+    push_row_thermal(tbl_c, 833, 1675, 0.486, 0.9);
+    push_row_thermal(tbl_c, 1111,1842, 0.5234, 0.9);
+    push_row_thermal(tbl_c, 1389,1968, 0.5601, 0.9);
+    push_row_thermal(tbl_c, 1667,2052, 0.605, 0.9);
+    push_row_thermal(tbl_c, 1944,2093, 0.729, 0.9);
+    push_row_thermal(tbl_c, 2222,2110, 0.9221, 0.9);
+    push_row_thermal(tbl_c, 2778,2135, 1.458, 0.9);
+    push_row_thermal(tbl_c, 3333,2152, 2.318, 0.9);
 }
 
 double cp_v_T(double T) { return interp1_linear(tbl_v.T, tbl_v.cp, T); }
@@ -185,9 +185,10 @@ double eps_surf(double T, double a)
 struct PyroGasTable
 {
     vector<double> T;
-    vector<double> cp;
-    vector<double> mu;
-    vector<double> h;    // ← YENİ: kJ/kg → J/kg ile kullanılacak
+    vector<double> cp;   // J/kg/K
+    vector<double> mu;   // Pa.s
+    vector<double> h;    // J/kg
+    vector<double> MW;   // kg/kmol
 };
 
 PyroGasTable tbl_pg;
@@ -204,148 +205,245 @@ void init_pyrogas_table()
     // pyrolysisModel.csv — P = 1.0 atm kesiti
     // kolonlar: T(K), h(kJ/kg), mu(millipoise→Pa·s), cp(kJ/kg·K)
     // push_row_pyro_gas(tbl_pg, T, cp [J/kgK], mu [Pa·s], h [J/kg])
-    auto push = [&](double T, double cp_kJ, double mu_mp, double h_kJ){
+    auto push = [&](double T, double cp_kJ, double mu_mp, double h_kJ, double MW_kgkmol){
         tbl_pg.T.push_back(T);
-        tbl_pg.cp.push_back(cp_kJ * 1000.0);
-        tbl_pg.mu.push_back(mu_mp * 1e-4);
-        tbl_pg.h.push_back(h_kJ * 1000.0);   // J/kg
+        tbl_pg.cp.push_back(cp_kJ * 1000.0);   // kJ/kgK -> J/kgK
+        tbl_pg.mu.push_back(mu_mp * 1e-4);     // millipoise -> Pa.s
+        tbl_pg.h.push_back(h_kJ * 1000.0);     // kJ/kg -> J/kg
+        tbl_pg.MW.push_back(MW_kgkmol);        // kg/kmol
     };
+        // push(200, 1.512, 8.688e-02, -7247, 22.00);
+        // push(225, 1.534, 9.666e-02, -7208, 22.00);
+        // push(250, 1.560, 1.065e-01, -7170, 22.00);
+        // push(275, 1.592, 1.162e-01, -7130, 22.00);
+        // push(300, 1.631, 1.257e-01, -7090, 22.00);
+        // push(325, 1.676, 1.351e-01, -7049, 22.00);
+        // push(350, 1.726, 1.444e-01, -7006, 22.00);
+        // push(375, 1.783, 1.534e-01, -6963, 21.99);
+        // push(400, 1.847, 1.623e-01, -6917, 21.99);
+        // push(425, 1.921, 1.710e-01, -6870, 21.99);
+        // push(450, 2.008, 1.796e-01, -6821, 21.98);
+        // push(475, 2.112, 1.879e-01, -6770, 21.97);
+        // push(500, 2.241, 1.962e-01, -6715, 21.95);
+        // push(525, 2.402, 2.042e-01, -6657, 21.92);
+        // push(550, 2.605, 2.122e-01, -6595, 21.87);
+        // push(575, 2.867, 2.201e-01, -6527, 21.80);
+        // push(600, 3.210, 2.279e-01, -6451, 21.71);
+        // push(625, 3.671, 2.356e-01, -6365, 21.59);
+        // push(650, 4.301, 2.432e-01, -6266, 21.42);
+        // push(675, 5.171, 2.509e-01, -6148, 21.19);
+        // push(700, 6.351, 2.586e-01, -6005, 20.89);
+        // push(725, 7.882, 2.664e-01, -5827, 20.50);
+        // push(750, 9.748, 2.744e-01, -5608, 19.99);
+        // push(775, 11.85, 2.826e-01, -5338, 19.37);
+        // push(800, 14.03, 2.909e-01, -5014, 18.64);
+        // push(825, 16.01, 2.993e-01, -4638, 17.84);
+        // push(850, 17.44, 3.076e-01, -4219, 17.00);
+        // push(875, 17.89, 3.157e-01, -3775, 16.19);
+        // push(900, 17.01, 3.235e-01, -3335, 15.46);
+        // push(925, 14.77, 3.309e-01, -2936, 14.86);
+        // push(950, 11.65, 3.378e-01, -2605, 14.41);
+        // push(975, 8.558, 3.444e-01, -2353, 14.12);
+        // push(1000, 6.222, 3.506e-01, -2170, 13.95);
+        // push(1025, 4.784, 3.566e-01, -2034, 13.85);
+        // push(1050, 4.014, 3.625e-01, -1925, 13.80);
+        // push(1075, 3.644, 3.683e-01, -1830, 13.78);
+        // push(1100, 3.509, 3.740e-01, -1741, 13.76);
+        // push(1125, 3.561, 3.797e-01, -1653, 13.75);
+        // push(1150, 3.901, 3.854e-01, -1561, 13.74);
+        // push(1175, 4.807, 3.913e-01, -1454, 13.71);
+        // push(1200, 6.235, 3.979e-01, -1316, 13.64);
+        // push(1225, 7.447, 4.053e-01, -1144, 13.53);
+        // push(1250, 8.140, 4.131e-01, -948.0, 13.40);
+        // push(1275, 8.479, 4.212e-01, -739.7, 13.26);
+        // push(1300, 8.634, 4.292e-01, -525.5, 13.11);
+        // push(1325, 8.707, 4.371e-01, -308.7, 12.97);
+        // push(1350, 8.767, 4.448e-01, -90.28, 12.84);
+        // push(1375, 8.860, 4.521e-01, 129.9, 12.71);
+        // push(1400, 9.024, 4.589e-01, 353.3, 12.58);
+        // push(1425, 9.288, 4.651e-01, 582.0, 12.46);
+        // push(1450, 9.674, 4.708e-01, 818.7, 12.34);
+        // push(1475, 10.19, 4.757e-01, 1067, 12.22);
+        // push(1500, 10.82, 4.799e-01, 1329, 12.10);
+        // push(1525, 11.52, 4.832e-01, 1608, 11.98);
+        // push(1550, 12.15, 4.859e-01, 1905, 11.86);
+        // push(1575, 12.53, 4.880e-01, 2214, 11.73);
+        // push(1600, 12.38, 4.899e-01, 2527, 11.61);
+        // push(1625, 11.51, 4.920e-01, 2827, 11.50);
+        // push(1650, 10.10, 4.946e-01, 3098, 11.40);
+        // push(1675, 8.590, 4.981e-01, 3331, 11.32);
+        // push(1700, 7.338, 5.021e-01, 3529, 11.26);
+        // push(1725, 6.422, 5.066e-01, 3701, 11.21);
+        // push(1750, 5.774, 5.112e-01, 3853, 11.17);
+        // push(1775, 5.312, 5.160e-01, 3991, 11.14);
+        // push(1800, 4.974, 5.209e-01, 4119, 11.12);
+        // push(1825, 4.723, 5.258e-01, 4241, 11.10);
+        // push(1850, 4.533, 5.306e-01, 4356, 11.08);
+        // push(1875, 4.389, 5.355e-01, 4468, 11.07);
+        // push(1900, 4.281, 5.404e-01, 4576, 11.06);
+        // push(1925, 4.200, 5.453e-01, 4682, 11.05);
+        // push(1950, 4.142, 5.502e-01, 4786, 11.04);
+        // push(1975, 4.103, 5.550e-01, 4889, 11.03);
+        // push(2000, 4.078, 5.599e-01, 4991, 11.02);
+        // push(2025, 4.068, 5.647e-01, 5093, 11.02);
+        // push(2050, 4.068, 5.696e-01, 5195, 11.01);
+        // push(2075, 4.080, 5.744e-01, 5297, 11.01);
+        // push(2100, 4.101, 5.792e-01, 5399, 11.00);
+        // push(2125, 4.130, 5.840e-01, 5502, 11.00);
+        // push(2150, 4.169, 5.888e-01, 5605, 11.00);
+        // push(2175, 4.215, 5.936e-01, 5710, 10.99);
+        // push(2200, 4.270, 5.984e-01, 5816, 10.99);
+        // push(2225, 4.333, 6.032e-01, 5924, 10.98);
+        // push(2250, 4.405, 6.080e-01, 6033, 10.98);
+        // push(2275, 4.484, 6.128e-01, 6144, 10.97);
+        // push(2300, 4.573, 6.176e-01, 6257, 10.96);
+        // push(2325, 4.670, 6.224e-01, 6373, 10.96);
+        // push(2350, 4.777, 6.272e-01, 6491, 10.95);
+        // push(2375, 4.893, 6.320e-01, 6612, 10.94);
+        // push(2400, 5.020, 6.368e-01, 6736, 10.93);
+        // push(2425, 5.157, 6.416e-01, 6863, 10.92);
+        // push(2450, 5.305, 6.464e-01, 6994, 10.91);
+        // push(2475, 5.465, 6.512e-01, 7128, 10.90);
+        // push(2500, 5.636, 6.560e-01, 7267, 10.89);
+        // push(2525, 5.821, 6.609e-01, 7410, 10.88);
+        // push(2550, 6.018, 6.657e-01, 7558, 10.86);
+        // push(2575, 6.229, 6.705e-01, 7711, 10.85);
+        // push(2600, 6.455, 6.754e-01, 7870, 10.83);
+        // push(2625, 6.695, 6.803e-01, 8034, 10.81);
+        // push(2650, 6.951, 6.852e-01, 8204, 10.80);
+        // push(2675, 7.224, 6.901e-01, 8382, 10.77);
+        // push(2700, 7.513, 6.951e-01, 8566, 10.75);
+        // push(2725, 7.820, 7.000e-01, 8757, 10.73);
+        // push(2750, 8.145, 7.050e-01, 8957, 10.70);
+        // push(2775, 8.489, 7.100e-01, 9165, 10.67);
+        // push(2800, 8.854, 7.151e-01, 9382, 10.64);
+        // push(2825, 9.238, 7.201e-01, 9608, 10.61);
+        // push(2850, 9.644, 7.252e-01, 9844, 10.58);
+        // push(2875, 10.07, 7.304e-01, 10090, 10.54);
+        // push(2900, 10.52, 7.356e-01, 10350, 10.50);
+        // push(2925, 11.00, 7.408e-01, 10620, 10.46);
+        // push(2950, 11.50, 7.461e-01, 10900, 10.42);
+        // push(2975, 12.02, 7.514e-01, 11190, 10.37);
+        // push(3000, 12.57, 7.567e-01, 11500, 10.33);
+        // push(3025, 13.15, 7.621e-01, 11820, 10.27);
+        // push(3050, 13.76, 7.676e-01, 12160, 10.22);
+        // push(3075, 14.39, 7.731e-01, 12510, 10.16);
+        // push(3100, 15.05, 7.787e-01, 12880, 10.11);
+        // push(3125, 15.73, 7.843e-01, 13260, 10.04);
+        // push(3150, 16.45, 7.900e-01, 13660, 9.978);
+        // push(3175, 17.19, 7.957e-01, 14080, 9.910);
+        // push(3200, 17.96, 8.015e-01, 14520, 9.839);
+        // push(3225, 18.75, 8.074e-01, 14980, 9.766);
+        // push(3250, 19.56, 8.133e-01, 15460, 9.689);
+        // push(3275, 20.39, 8.193e-01, 15960, 9.610);
+        // push(3300, 21.23, 8.253e-01, 16480, 9.529);
+        // push(3325, 22.09, 8.313e-01, 17020, 9.444);
+        // push(3350, 22.94, 8.374e-01, 17580, 9.357);
+        // push(3375, 23.80, 8.436e-01, 18170, 9.268);
+        // push(3400, 24.65, 8.497e-01, 18770, 9.177);
+        // push(3425, 25.49, 8.558e-01, 19400, 9.085);
+        // push(3450, 26.31, 8.620e-01, 20050, 8.990);
+        // push(3475, 27.09, 8.680e-01, 20720, 8.894);
+        // push(3500, 27.85, 8.741e-01, 21400, 8.797);
+        // push(3525, 28.56, 8.801e-01, 22110, 8.699);
+        // push(3550, 29.22, 8.859e-01, 22830, 8.601);
+        // push(3575, 29.83, 8.917e-01, 23570, 8.503);
+        // push(3600, 30.39, 8.974e-01, 24320, 8.405);
+        // push(3625, 30.88, 9.029e-01, 25090, 8.307);
+        // push(3650, 31.31, 9.082e-01, 25870, 8.210);
+        // push(3675, 31.67, 9.133e-01, 26650, 8.113);
+        // push(3700, 31.96, 9.183e-01, 27450, 8.018);
+        // push(3725, 32.19, 9.230e-01, 28250, 7.925);
+        // push(3750, 32.35, 9.276e-01, 29060, 7.833);
+        // push(3775, 32.44, 9.319e-01, 29870, 7.743);
+        // push(3800, 32.47, 9.360e-01, 30680, 7.655);
+        // push(3825, 32.44, 9.398e-01, 31490, 7.569);
+        // push(3850, 32.35, 9.435e-01, 32300, 7.485);
+        // push(3875, 32.20, 9.469e-01, 33110, 7.404);
+        // push(3900, 32.00, 9.502e-01, 33910, 7.325);
+        // push(3925, 31.75, 9.532e-01, 34710, 7.248);
+        // push(3950, 31.46, 9.561e-01, 35500, 7.174);
+        // push(3975, 31.13, 9.587e-01, 36280, 7.103);
+        //////////////////////////////////////////
+        // CHEMICAL EQUILIBRIUM PYROLYSIS GAS
 
-    push(200,  1.512, 8.688e-02, -7247.0);
-    push(225,  1.534, 9.666e-02, -7208.0);
-    push(250,  1.560, 1.065e-01, -7170.0);
-    push(275,  1.592, 1.162e-01, -7130.0);
-    push(300,  1.631, 1.257e-01, -7090.0);
-    push(325,  1.676, 1.351e-01, -7049.0);
-    push(350,  1.726, 1.444e-01, -7006.0);
-    push(375,  1.783, 1.534e-01, -6963.0);
-    push(400,  1.847, 1.623e-01, -6917.0);
-    push(425,  1.921, 1.710e-01, -6870.0);
-    push(450,  2.008, 1.796e-01, -6821.0);
-    push(475,  2.112, 1.879e-01, -6770.0);
-    push(500,  2.241, 1.962e-01, -6715.0);
-    push(525,  2.402, 2.042e-01, -6657.0);
-    push(550,  2.605, 2.122e-01, -6595.0);
-    push(575,  2.867, 2.201e-01, -6527.0);
-    push(600,  3.210, 2.279e-01, -6451.0);
-    push(625,  3.671, 2.356e-01, -6365.0);
-    push(650,  4.301, 2.432e-01, -6266.0);
-    push(675,  5.171, 2.509e-01, -6148.0);
-    push(700,  6.351, 2.586e-01, -6005.0);
-    push(725,  7.882, 2.664e-01, -5827.0);
-    push(750,  9.748, 2.744e-01, -5608.0);
-    push(775, 11.850, 2.826e-01, -5338.0);
-    push(800, 14.030, 2.909e-01, -5014.0);
-    push(825, 16.010, 2.993e-01, -4638.0);
-    push(850, 17.120, 3.077e-01, -4222.0);
-    push(875, 16.650, 3.161e-01, -3786.0);
-    push(900, 14.380, 3.243e-01, -3360.0);
-    push(925, 11.260, 3.322e-01, -2982.0);
-    push(950,  8.607, 3.397e-01, -2678.0);
-    push(975,  6.823, 3.467e-01, -2444.0);
-    push(1000,  5.748, 3.533e-01, -2261.0);
-    push(1025,  5.064, 3.596e-01, -2107.0);
-    push(1050,  4.620, 3.655e-01, -1972.0);
-    push(1075,  4.304, 3.711e-01, -1849.0);
-    push(1100,  4.054, 3.763e-01, -1735.0);
-    push(1125,  3.849, 3.812e-01, -1628.0);
-    push(1150,  3.677, 3.858e-01, -1527.0);
-    push(1175,  3.530, 3.900e-01, -1430.0);
-    push(1200,  3.401, 3.940e-01, -1337.0);
-    push(1225,  3.287, 3.977e-01, -1248.0);
-    push(1250,  3.186, 4.011e-01, -1162.0);
-    push(1275,  3.096, 4.043e-01, -1079.0);
-    push(1300,  3.017, 4.072e-01,  -998.5);
-    push(1325,  2.949, 4.099e-01,  -921.0);
-    push(1350,  2.893, 4.124e-01,  -845.5);
-    push(1375,  2.851, 4.147e-01,  -771.6);
-    push(1400,  2.824, 4.167e-01,  -697.7);
-    push(1425,  2.813, 4.185e-01,  -623.3);
-    push(1450,  2.818, 4.202e-01,  -547.9);
-    push(1475,  2.839, 4.218e-01,  -471.0);
-    push(1500,  2.875, 4.232e-01,  -392.3);
-    push(1525,  2.921, 4.246e-01,  -312.3);
-    push(1550,  2.970, 4.260e-01,  -230.8);
-    push(1575,  3.016, 4.274e-01,  -148.5);
-    push(1600,  3.050, 4.287e-01,   -66.0);
-    push(1625,  3.068, 4.300e-01,    17.0);
-    push(1650,  3.065, 4.313e-01,    99.7);
-    push(1675,  3.042, 4.325e-01,   181.6);
-    push(1700,  3.002, 4.337e-01,   262.4);
-    push(1725,  2.950, 4.348e-01,   341.8);
-    push(1750,  2.892, 4.358e-01,   419.4);
-    push(1775,  2.833, 4.368e-01,   495.4);
-    push(1800,  2.777, 4.377e-01,   569.8);
-    push(1825,  2.727, 4.386e-01,   642.7);
-    push(1850,  2.684, 4.394e-01,   714.4);
-    push(1875,  2.650, 4.401e-01,   784.8);
-    push(1900,  2.626, 4.408e-01,   854.3);
-    push(1925,  2.612, 4.415e-01,   923.0);
-    push(1950,  2.609, 4.421e-01,   991.3);
-    push(1975,  2.617, 4.427e-01,  1059.7);
-    push(2000,  2.636, 4.432e-01,  1128.7);
-    push(2025,  2.665, 4.438e-01,  1198.5);
-    push(2050,  2.703, 4.443e-01,  1269.4);
-    push(2075,  2.749, 4.448e-01,  1341.4);
-    push(2100,  2.802, 4.453e-01,  1414.7);
-    push(2125,  2.861, 4.458e-01,  1489.3);
-    push(2150,  2.925, 4.462e-01,  1565.2);
-    push(2175,  2.993, 4.466e-01,  1642.5);
-    push(2200,  3.065, 4.471e-01,  1721.2);
-    push(2225,  3.142, 4.475e-01,  1801.5);
-    push(2250,  3.224, 4.479e-01,  1883.4);
-    push(2275,  3.312, 4.483e-01,  1967.1);
-    push(2300,  3.407, 4.487e-01,  2052.7);
-    push(2325,  3.511, 4.492e-01,  2140.4);
-    push(2350,  3.624, 4.496e-01,  2230.3);
-    push(2375,  3.748, 4.500e-01,  2322.6);
-    push(2400,  3.882, 4.504e-01,  2417.5);
-    push(2425,  4.029, 4.508e-01,  2514.9);
-    push(2450,  4.190, 4.512e-01,  2615.3);
-    push(2475,  4.364, 4.516e-01,  2718.7);
-    push(2500,  4.552, 4.520e-01,  2825.3);
-    push(2550,  4.969, 4.528e-01,  3046.6);
-    push(2600,  5.436, 4.537e-01,  3282.4);
-    push(2650,  5.948, 4.545e-01,  3533.9);
-    push(2700,  6.503, 4.554e-01,  3802.4);
-    push(2750,  7.096, 4.562e-01,  4088.7);
-    push(2800,  7.720, 4.571e-01,  4393.7);
-    push(2850,  8.367, 4.580e-01,  4718.4);
-    push(2900,  9.026, 4.589e-01,  5063.5);
-    push(2950,  9.685, 4.598e-01,  5429.0);
-    push(3000, 10.330, 4.607e-01,  5815.0);
-    push(3050, 10.940, 4.617e-01,  6221.0);
-    push(3100, 11.500, 4.626e-01,  6647.0);
-    push(3200, 12.430, 4.646e-01,  7559.0);
-    push(3300, 13.190, 4.666e-01,  8541.0);
-    push(3400, 13.760, 4.687e-01,  9580.0);
-    push(3500, 14.090, 4.708e-01, 10660.0);
-    push(3600, 14.170, 4.730e-01, 11770.0);
-    push(3700, 13.990, 4.752e-01, 12890.0);
-    push(3800, 13.550, 4.775e-01, 14010.0);
-    push(3900, 12.870, 4.798e-01, 15120.0);
-    push(3975, 12.230, 4.816e-01, 16010.0);
+        // push(200, 1.512, 8.688e-02, -7247, 22.00);
+        // push(300, 1.631, 1.257e-01, -7090, 22.00);
+        // push(400, 1.847, 1.623e-01, -6917, 21.99);
+        // push(500, 2.241, 1.962e-01, -6715, 21.95);
+        // push(600, 3.210, 2.279e-01, -6451, 21.71);
+        // push(700, 6.351, 2.586e-01, -6005, 20.89);
+        // push(800, 14.03, 2.909e-01, -5014, 18.64);
+        // push(900, 17.01, 3.235e-01, -3335, 15.46);
+        // push(1000, 6.222, 3.506e-01, -2170, 13.95);
+        // push(1100, 3.509, 3.740e-01, -1741, 13.76);
+        // push(1200, 6.235, 3.979e-01, -1316, 13.64);
+        // push(1300, 8.634, 4.292e-01, -525.5, 13.11);
+        // push(1400, 9.024, 4.589e-01, 353.3, 12.58);
+        // push(1500, 10.82, 4.799e-01, 1329, 12.10);
+        // push(1600, 12.38, 4.899e-01, 2527, 11.61);
+        // push(1700, 7.338, 5.021e-01, 3529, 11.26);
+        // push(1800, 4.974, 5.209e-01, 4119, 11.12);
+        // push(1900, 4.281, 5.404e-01, 4576, 11.06);
+        // push(2000, 4.078, 5.599e-01, 4991, 11.02);
+        // FROZEN PYROLYSIS GAS
+
+        push(200, 1.873, 7.392e-02, -4930, 17.89);
+        push(300, 2.111, 1.086e-01, -4730, 17.89);
+        push(400, 2.327, 1.423e-01, -4508, 17.89);
+        push(500, 2.516, 1.745e-01, -4266, 17.89);
+        push(600, 2.679, 2.052e-01, -4006, 17.89);
+        push(700, 2.821, 2.345e-01, -3731, 17.89);
+        push(800, 2.947, 2.624e-01, -3442, 17.89);
+        push(900, 3.060, 2.892e-01, -3142, 17.89);
+        push(1000, 3.164, 3.150e-01, -2830, 17.89);
+        push(1100, 3.259, 3.398e-01, -2509, 17.89);
+        push(1200, 3.346, 3.638e-01, -2179, 17.89);
+        push(1300, 3.426, 3.870e-01, -1840, 17.89);
+        push(1400, 3.499, 4.096e-01, -1494, 17.89);
+        push(1500, 3.566, 4.314e-01, -1141, 17.89);
+        push(1600, 3.626, 4.527e-01, -781.2, 17.89);
+        push(1700, 3.682, 4.734e-01, -415.7, 17.89);
+        push(1800, 3.733, 4.936e-01, -44.98, 17.89);
+        push(1900, 3.779, 5.134e-01, 142.2, 17.89);
+        push(2000, 3.822, 5.327e-01, 710.7, 17.89);
+
+        
 }
 
 // Char solid enthalpy tablosu (thermalProperties.csv, SI)
 static const vector<double> hc_T_arr   = {256, 298, 444, 556, 644, 833,
                                            1111, 1389, 1667, 1944, 2222, 2778, 3333};
-static const vector<double> hc_val_arr = {-32200, 0, 137000, 271000, 394000, 687000,
-                                           1180000, 1710000, 2260000, 2840000, 3420000,
-                                           4600000, 5790000};
+static const vector<double> hc_val_arr = {-32160, 0, 137300, 271300, 393600, 687000,
+                                           1175000, 1705000, 2263000, 28439000, 3422000,
+                                           4602000, 5793000};
 
 double h_c_T(double T) { return interp1_linear(hc_T_arr, hc_val_arr, T); }  // J/kg
 double h_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.h, T); }   // J/kg
 
+// Virgin solid enthalpy tablosu (thermalProperties.csv, SI)
+static const vector<double> hv_T_arr   = {256,   298,   444,   556,   644,   833,
+                                          1111,  1389,  1667,  1944,  2222,  2778,  3333};
+static const vector<double> hv_val_arr = {-896700, -857100, -690100, -536500, -401600, -91240,
+                                           405900,  933400, 1477000, 2028000, 2583000,
+                                          3697000, 4813000};
+
+double h_v_T(double T) { return interp1_linear(hv_T_arr, hv_val_arr, T); }  // J/kg
+
 double cp_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.cp, T); }
 double mu_g_T(double T) { return interp1_linear(tbl_pg.T, tbl_pg.mu, T); }
+double MW_g_T(double T)
+{
+    return interp1_linear(tbl_pg.T, tbl_pg.MW, T);
+}
 
-static const vector<double> Qp_T   = {256, 298, 444, 556, 644, 833,
-                                       1111, 1389, 1667, 1944, 2222, 2778, 3333};
-static const vector<double> Qp_val = {-864540, -857000, -827400, -807800, -795200, -778240,
-                                       -769100, -772600, -786000, -808000, -837000, -903000, -977000};
+// Qp=0: TACOT tablosunda heat of pyrolysis ayri tanimlanmiyor (Ewing Eq.26)
+// double Q_p_T(double /*T*/) { return 0.0; }
 
-double Q_p_T(double T) { return interp1_linear(Qp_T, Qp_val, T); }
+
+// Qp: heat of pyrolysis [J/kg] — TACOT tablosundan, endotermik → negatif
+
+
 
 // =============================================================================
 // BPRIME TABLOSU
@@ -354,9 +452,8 @@ double Q_p_T(double T) { return interp1_linear(Qp_T, Qp_val, T); }
 struct BprimeTable
 {
     vector<double> bg;
-    vector<vector<double>> Tw;
     vector<vector<double>> Bc;
-    vector<vector<double>> Hw;    // ← YENİ: J/kg (bprime_table.txt 4. kolon)
+    vector<vector<double>> Hw;    // J/kg
 };
 
 BprimeTable bpt;
@@ -384,20 +481,18 @@ void load_bprime_table(const string& fname)
         if (bg != prev_bg)
         {
             bpt.bg.push_back(bg);
-            bpt.Tw.push_back(vector<double>());
             bpt.Bc.push_back(vector<double>());
             bpt.Hw.push_back(vector<double>());
             ibg++;
             prev_bg = bg;
         }
 
-        bpt.Tw[ibg].push_back(tw);
         bpt.Bc[ibg].push_back(bc);
-        bpt.Hw[ibg].push_back(hw);   // J/kg olarak geliyor
+        bpt.Hw[ibg].push_back(hw);
     }
 
     const int nBg  = (int)bpt.bg.size();
-    const int nRow = (nBg > 0) ? (int)bpt.Tw[0].size() : 0;
+    const int nRow = (nBg > 0) ? (int)bpt.Bc[0].size() : 0;
     printf("[TABLE] %s: %d Bg grubu, %d satir/grup\n", fname.c_str(), nBg, nRow);
 }
 
@@ -417,132 +512,98 @@ static void bg_bracket(double Bg, int& i0, int& i1, double& t)
     t  = (Bg - bpt.bg[i0]) / (bpt.bg[i1] - bpt.bg[i0]);
 }
 
-static double row_interp(const vector<double>& row, double L)
+// Tw grid: 250, 275, 300, ..., 4000  (adim 25 K, 151 satir/grup)
+static const double TW_MIN  = 250.0;
+static const double TW_STEP = 25.0;
+
+static double tw_row_interp(const vector<double>& row, double Tw)
 {
     const int N = (int)row.size();
     if (N == 0) return 0.0;
-    if (N == 1) return row[0];
 
-    double idx = L - 1.0;
-    if (idx < 0.0) idx = 0.0;
-    if (idx > (double)(N - 1)) idx = (double)(N - 1);
+    double idx = (Tw - TW_MIN) / TW_STEP;
+    if (idx < 0.0)           idx = 0.0;
+    if (idx > (double)(N-1)) idx = (double)(N-1);
 
     const int j0 = (int)idx;
-    const int j1 = (j0 < N - 1) ? (j0 + 1) : j0;
+    const int j1 = (j0 < N-1) ? j0+1 : j0;
     const double tj = idx - j0;
-
     return lerp(row[j0], row[j1], tj);
 }
 
-double lookup_Tw(double Bg, double L)
+double lookup_Bc(double Bg, double Tw)
 {
     int i0, i1; double t;
     bg_bracket(Bg, i0, i1, t);
-    return lerp(row_interp(bpt.Tw[i0], L), row_interp(bpt.Tw[i1], L), t);
+    return lerp(tw_row_interp(bpt.Bc[i0], Tw),
+                tw_row_interp(bpt.Bc[i1], Tw), t);
 }
 
-double lookup_Bc(double Bg, double L)
+double lookup_Hw(double Bg, double Tw)   // J/kg doner
 {
     int i0, i1; double t;
     bg_bracket(Bg, i0, i1, t);
-    return lerp(row_interp(bpt.Bc[i0], L), row_interp(bpt.Bc[i1], L), t);
-}
-
-double lookup_Hw(double Bg, double L)    // J/kg döner
-{
-    int i0, i1; double t;
-    bg_bracket(Bg, i0, i1, t);
-    return lerp(row_interp(bpt.Hw[i0], L), row_interp(bpt.Hw[i1], L), t);
+    return lerp(tw_row_interp(bpt.Hw[i0], Tw),
+                tw_row_interp(bpt.Hw[i1], Tw), t);
 }
 
 // =============================================================================
-// NEWTON-RAPHSON on L  (Ewing Eq.86-90)
-// Case 5: enthalpy-based enerji dengesi
-//   q_cond = rho_ue_CH*(H_r - h_w) + eps*sigma*(T_surr^4 - Tw^4) + rho_ue_CH*Tchem/cp_g
-//   h_w = cp_g * Tw  (simplified, unity Le)
-//   f(L) = k_surf/dx*(Tw-T1) - rho_ue_CH*(H_r - cp_g*Tw)
-//          - eps*sigma*(T_surr^4-Tw^4) - rho_ue_CH*Tchem
-// =============================================================================
-// =============================================================================
-// NEWTON-RAPHSON on L  — Ewing Eq. 86 + 87 (unity Le)
+// NEWTON-RAPHSON on Tw  — Ewing Eq. 86 + 87 (unity Le)
 //
-//   T_chem = (-1 - B') * h_w  +  B'_c * h_c(Tw)  +  B'_g * h_g(Tw)
+//   T_chem = (-1 - B') * h_w(Bg,Tw)  +  B'_c(Bg,Tw) * h_c(Tw)  +  B'_g * h_g(Tw)
 //   B' = B'_g + B'_c
 //
-//   q''_cond = rho_ue_CH * (H_r + T_chem)
-//            + alpha_w * q_rad_inc
-//            - eps_w * sigma * Tw^4
-//
-//   Denge: q''_cond = k_surf/dx * (Tw - T1)
-//
-//   f(L) = rho_ue_CH * (H_r + T_chem(Bg,L))
-//        + alpha_w * q_rad_inc
-//        - eps_w * sigma * Tw(Bg,L)^4
-//        - k_surf / dx * (Tw(Bg,L) - T1)
-//        = 0
-//
-//   Tablolardan:
-//     Tw(Bg,L)  → lookup_Tw
-//     Bc(Bg,L)  → lookup_Bc   (= B'_c)
-//     Hw(Bg,L)  → lookup_Hw   (= h_w, J/kg)
-//     B'_g      → Bg (giriş parametresi, tablo ekseni)
-//     h_c(Tw)   → h_c_T
-//     h_g(Tw)   → h_g_T
+//   f(Tw) = rho_ue_CH * (H_r + T_chem)
+//          - eps * sigma * (Tw^4 - T_surr^4)
+//          - k_surf/dx * (Tw - T1)
+//          = 0
 // =============================================================================
-double solve_L_NR(double Bg,
-                  double rho_ue_CH,
-                  double H_r,
-                  double k_surf,
-                  double dx_surf,
-                  double T1,
-                  double emissivity,
-                  double alpha_w,
-                  double q_rad_inc,
-                  double sigma_SB,
-                  double L_guess)
+double solve_Tw_NR(double Bg,
+                   double rho_ue_CH,
+                   double H_r,
+                   double k_surf,
+                   double dx_surf,
+                   double T1,
+                   double emissivity,
+                   double sigma_SB,
+                   double T_surr,
+                   double Tw_guess)
 {
-    const double dL    = 0.01;
-    const double L_min = 1.0;
-    const double L_max = (double)bpt.Tw[0].size();
-    double L = L_guess;
+    const double dTw   = 1.0;      // finite-diff adimi [K]
+    const double Tw_min = 300.0;
+    const double Tw_max = 4000.0;
+    double Tw = Tw_guess;
 
-    auto eval_f = [&](double Lx) -> double
+    auto eval_f = [&](double Twx) -> double
     {
-        double Tw   = lookup_Tw(Bg, Lx);
-        double Bc   = lookup_Bc(Bg, Lx);        // B'_c
-        double hw   = lookup_Hw(Bg, Lx);        // h_w  [J/kg]
-        double Bp   = Bg + Bc;                  // B' = B'_g + B'_c
+        double Bc    = lookup_Bc(Bg, Twx);
+        double hw    = lookup_Hw(Bg, Twx);
+        double Bp    = Bg + Bc;
+        double hc    = h_c_T(Twx);
+        double hg    = h_g_T(Twx);
+        double Tchem = (-1.0 - Bp)*hw + Bc*hc + Bg*hg;
 
-        double hc   = h_c_T(Tw);               // char solid enthalpi [J/kg]
-        double hg   = h_g_T(Tw);               // pyro gas enthalpi   [J/kg]
-        double T_surr     = 300.0;
-        // Eq. 87
-        double Tchem = (-1.0 - Bp) * hw  +  Bc * hc  +  Bg * hg;
-        // cout<<rho_ue_CH * (H_r + Tchem)<<" "<<1*emissivity * sigma_SB * (pow(Tw, 4.0) - pow(T_surr, 4.0))<<" "<<(k_surf / dx_surf) * (Tw - T1)<<endl;
-
-        // Eq. 86 residual
-        // Eq. 86 residual
         return rho_ue_CH * (H_r + Tchem)
-            - 1*emissivity * sigma_SB * (pow(Tw, 4.0) - pow(T_surr, 4.0))
-            - (k_surf / dx_surf) * (Tw - T1);
+             - emissivity * sigma_SB * (pow(Twx, 4.0) - pow(T_surr, 4.0))
+             - (k_surf / dx_surf) * (Twx - T1);
     };
 
-    for (int iter = 0; iter < 1000; iter++)
+    for (int iter = 0; iter < 300; iter++)
     {
-        double f    = eval_f(L);
-        double L2   = min(L + dL, L_max);
-        double dfdL = (eval_f(L2) - f) / dL;
+        double f    = eval_f(Tw);
+        double Tw2  = min(Tw + dTw, Tw_max);
+        double dfdT = (eval_f(Tw2) - f) / dTw;
 
-        if (fabs(dfdL) < 1e-30) break;
+        if (fabs(dfdT) < 1e-30) break;
 
-        double step = -f / dfdL;
-        step = max(-10.0, min(10.0, step));
-        L   += step;
-        L    = max(L_min, min(L_max, L));
+        double step = -f / dfdT;
+        step = max(-200.0, min(200.0, step));
+        Tw  += step;
+        Tw   = max(Tw_min, min(Tw_max, Tw));
 
-        if (fabs(step) < 1e-6) break;
+        if (fabs(step) < 0.01) break;
     }
-    return L;
+    return Tw;
 }
 
 // =============================================================================
@@ -592,14 +653,14 @@ int main()
         x[m] = m * L_domain / (N_nodes - 1);
 
     const int N_comp = 3;
-    vector<double> B_arr   = {1.200e4,  4.480e9,  0.0};
+    vector<double> B_arr   = {1.400e4,  9.750e8,  0.0};
     vector<double> Psi_arr = {3.0,      3.0,      0.0};
     vector<double> E_arr   = {71.14e6,  169.98e6, 0.0};
 
     const double Gamma  = 0.5;
     const double R_univ = 8314.0; //J/kmol/K
-    const double MW_air = 17; //kg/kmol 
-    const double R_air  = R_univ / MW_air; // J/kg/K
+    // const double MW_air = 12; //kg/kmol 
+    // const double R_air  = R_univ / MW_air; // J/kg/K
 
     const double T_reac[3] = {333.3, 555.6, 5556.0};
 
@@ -636,7 +697,8 @@ int main()
     // Case 5 SINIR KOSULU PARAMETRELERİ (Ewing 2013, Sec. IV.E)
     // =========================================================================
     const double rho_ue_CH0 = 0.3;        // enthalpy-based HTC [kg/m2/s], blowing yokken
-    const double H_recovery = 1.5e6;      // recovery enthalpy [J/kg]
+    const double H_recovery = 2.5e7;      // recovery enthalpy [J/kg] — Case 2.3
+    // const double H_recovery=1.5e6;
     const double t_ramp_end = 0.1;        // HTC ramp süresi [s]: 0 -> rho_ue_CH0 lineer
 
     const double sigma_SB =5.670374419e-8;
@@ -673,7 +735,7 @@ int main()
     double T_wall        = T_old[0];
     double m_dot_g       = 0.0;
     double k_surf;
-    double h_eff         = 0.0;   // blowing-corrected rho_ue_CH [kg/m2/s]
+    double h_eff         = rho_ue_CH0;   // blowing-corrected rho_ue_CH [kg/m2/s]
     double m_dot_surface = 0.0;
 
     // =========================================================================
@@ -681,7 +743,7 @@ int main()
     // =========================================================================
     ofstream fout("ablation_history.csv");
     fout << "time,Twall,T1,P0,mdot,rho_ue_CH,sdot_mm_s,recession_mm,thickness_mm,"
-            "Bg,Bc,L_nr,eps_surf,k_surf,iter,converged,resid_pct,mdot_g,mdot_c,T_24mm\n";
+            "Bg,Bc,Tw_nr,eps_surf,k_surf,iter,converged,resid_pct,mdot_g,mdot_c,T_24mm\n";
 
     const int save_every = 2;
 
@@ -703,7 +765,6 @@ int main()
     vector<double> T_new(N_nodes);
 
     double sdot   = 0.0;
-    double L_prev = 0;
     double Bg_now = 0.0, Bc_now = 0.0;
 
     int n_converged     = 0;
@@ -725,20 +786,8 @@ int main()
         double rho_ue_CH_now = ramp * rho_ue_CH0;
         // =====================================================================
         // m_dot_g (pyroliz gaz uretimi entegrali) ve m_dot_c
-        // =====================================================================
-        double mdot_g_total = 0.0;
-        for (int i = 0; i < N_nodes; i++)
-        {
-            double dx_i;
-            if (i == 0)
-                dx_i = 0.5*(x[1] - x[0]);
-            else if (i == N_nodes-1)
-                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
-            else
-                dx_i = 0.5*(x[i+1] - x[i-1]);
-            mdot_g_total += (-drho_dt[i] * dx_i);
-        }
-        double mdot_c_out = Bc_now * rho_ue_CH_now;   // [kg/m2/s]
+        // mdot_c (bir adim onceki Bc ile, timestep basinda)
+        double mdot_c_out = Bc_now * h_eff;   // [kg/m2/s]
         alpha_eff_old = alpha_eff;
 
         // =====================================================================
@@ -792,6 +841,22 @@ int main()
             k_node[i] = k_mix(T_old[i], alpha_eff[i]);
         }
 
+        // mdot_g_total: bu adimin drho_dt'sinden integral
+        // rho azaliyor → drho_dt > 0 (alpha artiyor, yogunluk azaliyor)
+        // gaz uretimi = -d(rho_solid)/dt * dx → pozitif olmali
+        double mdot_g_total = 0.0;
+        for (int i = 0; i < N_nodes; i++)
+        {
+            double dx_i;
+            if (i == 0)
+                dx_i = 0.5*(x[1] - x[0]);
+            else if (i == N_nodes-1)
+                dx_i = 0.5*(x[N_nodes-1] - x[N_nodes-2]);
+            else
+                dx_i = 0.5*(x[i+1] - x[i-1]);
+            mdot_g_total += drho_dt[i] * dx_i;   // drho_dt pozitif → rho azaliyor
+        }
+
         // =====================================================================
         // 3. dT/dt
         // =====================================================================
@@ -817,6 +882,7 @@ int main()
             p_dxi = 0.5*(p_dxl + p_dxr);
 
             p_phi   = phi_v*(1.0-alpha_eff[i]) + phi_c*alpha_eff[i];
+            double R_air=R_univ /MW_g_T(T_old[i]);
             p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
 
             double K_i  = K_v*(1.0-alpha_eff[i])   + K_c*alpha_eff[i];
@@ -852,6 +918,7 @@ int main()
             double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
             double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
             double K_surf_tmp = 2.0*K_0*K_1 / (K_0 + K_1);
+            double R_air=R_univ /MW_g_T(T_old[0]);
             m_dot_surface = (P_new[0]/(R_air*T_old[0]))
                           * (K_surf_tmp/mu_g_T(T_old[0]))
                           * (P_new[1]-P_new[0]) / dx_surf;
@@ -881,6 +948,7 @@ int main()
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
+                double R_air=R_univ /MW_g_T(T_wall);
                 m_dot_surface = (P_new[0]/(R_air*T_wall))
                               * (K_surf2/mu_g_T(T_wall))
                               * (P_new[1]-P_new[0]) / dx_surf;
@@ -890,49 +958,46 @@ int main()
             // else
             //     h_eff = 0.0;
             m_dot_g = m_dot_surface;
-            cout<<mdot_g_total<<endl;
+
             double T_wall_new = T_wall;
 
-            // (a) NR on L — Bg = m_dot_g / rho_ue_CH_now  (enthalpy-based B'g)
-            double cp_g_wall = cp_g_T(T_wall);
-            // Bg_now = m_dot_g / rho_ue_CH_now;
-            Bg_now=mdot_g_total / rho_ue_CH_now;
+            // (a) NR on Tw — Bg = mdot_g_total / rho_ue_CH_now
+            Bg_now = (rho_ue_CH_now > 0.0) ? (mdot_g_total / h_eff) : 0.0;
             if (Bg_now < 0.0) Bg_now = 0.0;
 
-            double emissivity_now = eps_surf(T_wall, alpha_eff[0]);
-            double L_cur = solve_L_NR(Bg_now, rho_ue_CH_now, H_recovery,
-                                    k_surf, dx_surf, T1,
-                                    emissivity_now,
-                                    1.0,    // alpha_w — gray body
-                                    0.0,    // q_rad_inc — Case 5'te yok
-                                    sigma_SB,
-                                    L_prev);
-            L_prev = L_cur;
-            T_wall_new = lookup_Tw(Bg_now, L_cur);
+            // blowing correction: toplam yuzey kitlesi = mdot_g + mdot_c
+            double mdot_total_blow = mdot_g_total + Bc_now * rho_ue_CH_now;
+            if (mdot_total_blow < 0.0) mdot_total_blow = 0.0;
+            if (rho_ue_CH_now > 0.0)
+                blowing_factor(mdot_total_blow, rho_ue_CH_now, h_eff);
+            else
+                h_eff = 0.0;
 
-            Bc_now = lookup_Bc(Bg_now, L_cur);
+            double emissivity_now = eps_surf(T_wall, alpha_eff[0]);
+            T_wall_new = solve_Tw_NR(Bg_now, h_eff, H_recovery,
+                                     k_surf, dx_surf, T1,
+                                     emissivity_now, sigma_SB, T_surr,
+                                     T_wall);
+
+            Bc_now = lookup_Bc(Bg_now, T_wall_new);
 
             // sdot = B'c * rho_ue_CH / rho_c  (enthalpy-based, Ewing Eq.52)
-            sdot = (rho_ue_CH_now > 0.0) ? (Bc_now * rho_ue_CH_now / rho_char_total) : 0.0;
+            sdot = (rho_ue_CH_now > 0.0) ? (Bc_now * h_eff / rho_char_total) : 0.0;
             if (sdot < 0.0) sdot = 0.0;
 
             double sdot_old_iter = sdot_iter;
             sdot_iter = sdot;
 
-            // (ii) mdot / h_eff tekrar guncelle
+            // (ii) m_dot_surface güncelle (T_wall_new ile)
             {
                 double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
                 double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
+                double R_air=R_univ /MW_g_T(T_wall_new);
                 m_dot_surface = (P_new[0]/(R_air*T_wall_new))
                               * (K_surf2/mu_g_T(T_wall_new))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            if (rho_ue_CH_now > 0.0)
-                blowing_factor(m_dot_surface, rho_ue_CH_now, h_eff);
-            else
-                h_eff = 0.0;
-            m_dot_g = m_dot_surface;
 
             // (b) SICAKLIK TDMA
             for (int i = 0; i < N_nodes; i++)
@@ -951,7 +1016,7 @@ int main()
 
                 t_ke = 2.0*k_node[i]*k_node[i+1] / (k_node[i]+k_node[i+1]);
                 t_kw = 2.0*k_node[i]*k_node[i-1] / (k_node[i]+k_node[i-1]);
-
+                double R_air=R_univ /MW_g_T(T_old[i]);
                 t_rhogas = P_new[i] / (R_air*T_old[i]);
                 t_rhoc   = rho_solid_new[i]*t_cp
                          + t_rhogas*t_phi*cp_g_T(T_old[i]);
@@ -962,11 +1027,28 @@ int main()
                 double K_i2 = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
                 t_mdotgas = t_rhogas * (K_i2/mu_g_T(T_old[i]))
                           * (P_new[i+1]-P_new[i-1]) / (t_dxl+t_dxr);
-                t_hgrad   = cp_g_T(T_old[i])
-                          * (T_old[i+1]-T_old[i-1]) / (t_dxl+t_dxr);
-
+                t_hgrad   =(h_g_T(T_old[i+1])-h_g_T(T_old[i-1])) / (t_dxl+t_dxr);
                 double d_alpha_eff_dt = (alpha_eff[i] - alpha_eff_old[i]) / dt;
-                t_Spyro  = -(Q_p_T(T_old[i])) * (rho_virgin-rho_char_total) * d_alpha_eff_dt;
+
+                // Ewing Eq.30: hs = hv*(1-alpha) + hc*alpha
+                // Ewing Eq.34: h* = hs + rho_s*(hv-hc)/(rho_v-rho_c)
+                // Ewing Eq.35 (Qp=0): S_pyro = (h* - hg)*(rho_v-rho_c)*dalpha/dt
+                double hv_i    = h_v_T(T_old[i]);
+                double hc_i    = h_c_T(T_old[i]);
+                double hg_i    = h_g_T(T_old[i]);
+                double hs_i    = hv_i*(1.0 - alpha_eff[i]) + hc_i*alpha_eff[i];
+                double hstar_i = hs_i + rho_solid_new[i]*(hv_i - hc_i)
+                                       / (rho_virgin - rho_char_total);
+                // // Qp=0 (TACOT) → only h* and hg terms remain
+                // t_Spyro  = (hstar_i - hg_i)
+                //            * (rho_virgin - rho_char_total) * d_alpha_eff_dt;
+
+                double hbar_i = (rho_virgin*hv_i - rho_char_total*hc_i)
+                            / (rho_virgin - rho_char_total);
+                // Volkan Eq.2.5-2.6: S_pyr = -drho_dt * (hg - hbar)
+                // t_Spyro = -drho_dt[i] * (hg_i - hbar_i);
+                t_Spyro=(-(hg_i - hbar_i)-hstar_i+hg_i)*(rho_virgin - rho_char_total) * d_alpha_eff_dt;
+
                 t_Stotal = t_Spyro + t_mdotgas*t_hgrad;
 
                 a_T[i] = t_atime + t_ae + t_aw;
@@ -981,6 +1063,7 @@ int main()
                 t_dxl    = x[jj] - x[jj-1];
                 t_cp     = cp_mix(T_old[jj], alpha_eff[jj]);
                 t_phi    = phi_v*(1.0-alpha_eff[jj]) + phi_c*alpha_eff[jj];
+                double R_air=R_univ /MW_g_T(T_old[jj]);
                 t_rhogas = P_new[jj] / (R_air*T_old[jj]);
                 t_rhoc   = rho_solid_new[jj]*t_cp
                          + t_rhogas*t_phi*cp_g_T(T_old[jj]);
@@ -1012,8 +1095,8 @@ int main()
         // Yuzey enerji dengesi residual (enthalpy-based)
         // Yüzey enerji dengesi residual (Eq. 86+87)
         double Tw_f   = T_wall;
-        double Bc_f   = lookup_Bc(Bg_now, L_prev);
-        double hw_f   = lookup_Hw(Bg_now, L_prev);
+        double Bc_f   = lookup_Bc(Bg_now, Tw_f);
+        double hw_f   = lookup_Hw(Bg_now, Tw_f);
         double Bp_f   = Bg_now + Bc_f;
         double hc_f   = h_c_T(Tw_f);
         double hg_f   = h_g_T(Tw_f);
@@ -1111,7 +1194,7 @@ int main()
                  << P_new[0] << "," << m_dot_surface << "," << h_eff << ","
                  << sdot*1e3 << "," << recession_total*1e3 << ","
                  << thickness_now*1e3 << ","
-                 << Bg_now << "," << Bc_now << "," << L_prev << ","
+                 << Bg_now << "," << Bc_now << "," << T_wall << ","
                  << eps_surf(T_wall, alpha_eff[0]) << "," << k_surf << ","
                  << iter_count << ","
                  << (iter_converged ? 1 : 0) << ","
