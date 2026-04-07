@@ -1027,9 +1027,7 @@ int main()
                 double K_i2 = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
                 t_mdotgas = t_rhogas * (K_i2/mu_g_T(T_old[i]))
                           * (P_new[i+1]-P_new[i-1]) / (t_dxl+t_dxr);
-                t_hgrad   = cp_g_T(T_old[i])
-                          * (T_old[i+1]-T_old[i-1]) / (t_dxl+t_dxr);
-
+                t_hgrad   =(h_g_T(T_old[i+1])-h_g_T(T_old[i-1])) / (t_dxl+t_dxr);
                 double d_alpha_eff_dt = (alpha_eff[i] - alpha_eff_old[i]) / dt;
 
                 // Ewing Eq.30: hs = hv*(1-alpha) + hc*alpha
@@ -1039,8 +1037,8 @@ int main()
                 double hc_i    = h_c_T(T_old[i]);
                 double hg_i    = h_g_T(T_old[i]);
                 double hs_i    = hv_i*(1.0 - alpha_eff[i]) + hc_i*alpha_eff[i];
-                // double hstar_i = hs_i + rho_solid_new[i]*(hv_i - hc_i)
-                //                        / (rho_virgin - rho_char_total);
+                double hstar_i = hs_i + rho_solid_new[i]*(hv_i - hc_i)
+                                       / (rho_virgin - rho_char_total);
                 // // Qp=0 (TACOT) → only h* and hg terms remain
                 // t_Spyro  = (hstar_i - hg_i)
                 //            * (rho_virgin - rho_char_total) * d_alpha_eff_dt;
@@ -1048,7 +1046,8 @@ int main()
                 double hbar_i = (rho_virgin*hv_i - rho_char_total*hc_i)
                             / (rho_virgin - rho_char_total);
                 // Volkan Eq.2.5-2.6: S_pyr = -drho_dt * (hg - hbar)
-                t_Spyro = -drho_dt[i] * (hg_i - hbar_i);
+                // t_Spyro = -drho_dt[i] * (hg_i - hbar_i);
+                t_Spyro=(-(hg_i - hbar_i)-hstar_i+hg_i)*(rho_virgin - rho_char_total) * d_alpha_eff_dt;
 
                 t_Stotal = t_Spyro + t_mdotgas*t_hgrad;
 
