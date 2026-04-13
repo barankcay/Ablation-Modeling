@@ -691,7 +691,7 @@ int main()
     const double rho_virgin     = (1.0-phi_v) * rho_intr_v;
     const double rho_char_total = (1.0-phi_c) * rho_intr_c;
 
-    const double T_back  = 298.0, P_surf = 101325.0, P_back = 101325.0;
+    const double T_back  = 300, P_surf = 101325.0, P_back = 101325.0;
 
     // =========================================================================
     // Case 5 SINIR KOSULU PARAMETRELERİ (Ewing 2013, Sec. IV.E)
@@ -783,6 +783,10 @@ int main()
 
         
         double time    = n * dt;
+        double T_wall_bc = (time <= 0.1) 
+                   ? (300.0 + (1644.0 - 300.0) * (time / 0.1)) 
+                   : 1644.0;
+        T_wall = T_wall_bc;
         double dx_surf = x[1] - x[0];
 
         // Case 5: lineer ramp — t <= 0.1s arası 0'dan rho_ue_CH0'a çıkar
@@ -895,9 +899,12 @@ int main()
             double R_air=R_univ /MW_g_T(T_old[i]);
             p_atime = p_phi / (R_air*T_old[i]) * p_dxi / dt;
 
-            double K_i  = K_v*(1.0-alpha_eff[i])   + K_c*alpha_eff[i];
-            double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];
-            double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];
+            // double K_i  = K_v*(1.0-alpha_eff[i])   + K_c*alpha_eff[i];
+            double K_i  = pow(K_v, 1.0-alpha_eff[i]) * pow(K_c, alpha_eff[i]);  // alternatif: log-ortalamaya gore
+            // double K_im = K_v*(1.0-alpha_eff[i-1]) + K_c*alpha_eff[i-1];
+            double K_im = pow(K_v, 1.0-alpha_eff[i-1]) * pow(K_c, alpha_eff[i-1]);  // alternatif: log-ortalamaya gore
+            // double K_ip = K_v*(1.0-alpha_eff[i+1]) + K_c*alpha_eff[i+1];
+            double K_ip = pow(K_v, 1.0-alpha_eff[i+1]) * pow(K_c, alpha_eff[i+1]);  // alternatif: log-ortalamaya gore
 
             double P_e = 0.5*(P_old[i] + P_old[i+1]);
             double P_w = 0.5*(P_old[i] + P_old[i-1]);
@@ -925,9 +932,11 @@ int main()
         // 5. BLOWING (ilk tahmin)
         // =====================================================================
         {
-            T_old[0]=1644.0;
-            double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-            double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+            T_old[0] = T_wall_bc;          // 1644.0 yerine
+            // double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+            double K_0    = pow(K_v, 1.0-alpha_eff[0]) * pow(K_c, alpha_eff[0]);  // alternatif: log-ortalamaya gore
+            // double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+            double K_1    = pow(K_v, 1.0-alpha_eff[1]) * pow(K_c, alpha_eff[1]);  // alternatif: log-ortalamaya gore
             double K_surf_tmp = 2.0*K_0*K_1 / (K_0 + K_1);
             double R_air=R_univ /MW_g_T(T_old[0]);
             m_dot_surface = (P_new[0]/(R_air*T_old[0]))
@@ -956,12 +965,14 @@ int main()
             
             // (i) mdot / h_eff guncelle
             {
-                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                // double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_0    = pow(K_v, 1.0-alpha_eff[0]) * pow(K_c, alpha_eff[0]);  // alternatif: log-ortalamaya gore
+                // double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_1    = pow(K_v, 1.0-alpha_eff[1]) * pow(K_c, alpha_eff[1]);  // alternatif: log-ortalamaya gore
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                double R_air=R_univ /MW_g_T(1644.0);
-                m_dot_surface = (P_new[0]/(R_air*1644.0))
-                              * (K_surf2/mu_g_T(1644.0))
+                double R_air=R_univ /MW_g_T(T_wall_bc);
+                m_dot_surface = (P_new[0]/(R_air*T_wall_bc))
+                              * (K_surf2/mu_g_T(T_wall_bc))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
             // if (rho_ue_CH_now > 0.0)
@@ -989,7 +1000,7 @@ int main()
                                      k_surf, dx_surf, T1,
                                      emissivity_now, sigma_SB, T_surr,
                                      T_wall);
-            T_wall_new=1644.0;
+            // T_wall_new=1644.0;
             Bc_now = lookup_Bc(Bg_now, T_wall_new);
 
             // sdot = B'c * rho_ue_CH / rho_c  (enthalpy-based, Ewing Eq.52)
@@ -1000,20 +1011,23 @@ int main()
 
             // (ii) m_dot_surface güncelle (T_wall_new ile)
             {
-                double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
-                double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                // double K_0    = K_v*(1.0-alpha_eff[0]) + K_c*alpha_eff[0];
+                double K_0    = pow(K_v, 1.0-alpha_eff[0]) * pow(K_c, alpha_eff[0]);  // alternatif: log-ortalamaya gore
+                // double K_1    = K_v*(1.0-alpha_eff[1]) + K_c*alpha_eff[1];
+                double K_1    = pow(K_v, 1.0-alpha_eff[1]) * pow(K_c, alpha_eff[1]);  // alternatif: log-ortalamaya gore
                 double K_surf2 = 2.0*K_0*K_1 / (K_0 + K_1);
-                double R_air=R_univ /MW_g_T(1644.0);
-                m_dot_surface = (P_new[0]/(R_air*1644.0))
-                              * (K_surf2/mu_g_T(1644.0))
+                double R_air=R_univ /MW_g_T(T_wall_bc);
+                m_dot_surface = (P_new[0]/(R_air*T_wall_bc))
+                              * (K_surf2/mu_g_T(T_wall_bc))
                               * (P_new[1]-P_new[0]) / dx_surf;
             }
-            T_old[0]=1644.0;
+            T_old[0]=T_wall_bc;
             // (b) SICAKLIK TDMA
             for (int i = 0; i < N_nodes; i++)
                 a_T[i] = b_T[i] = c_T[i] = d_T[i] = 0.0;
 
-            a_T[0] = 1.0; d_T[0] = 1644;
+            
+            a_T[0] = 1.0;  d_T[0] = T_wall_bc;
 
             for (int i = 1; i < N_nodes-1; i++)
             {
@@ -1034,7 +1048,8 @@ int main()
                 t_ae     = t_ke / t_dxr;
                 t_aw     = t_kw / t_dxl;
 
-                double K_i2 = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+                // double K_i2 = K_v*(1.0-alpha_eff[i]) + K_c*alpha_eff[i];
+                double K_i2 = pow(K_v, 1.0-alpha_eff[i]) * pow(K_c, alpha_eff[i]);  // alternatif: log-ortalamaya gore
                 t_mdotgas = t_rhogas * (K_i2/mu_g_T(T_old[i]))
                           * (P_new[i+1]-P_new[i-1]) / (t_dxl+t_dxr);
                 t_hgrad   =(h_g_T(T_old[i+1])-h_g_T(T_old[i-1])) / (t_dxl+t_dxr);
@@ -1092,7 +1107,7 @@ int main()
             double dT1    = fabs(T1_new   - T1);
             double dsdot  = fabs(sdot_iter - sdot_old_iter);
 
-            T_wall = 1644.0;
+            T_wall = T_wall_bc;
             T1     = T1_new;
 
             if (dT1 < eps_T && dsdot < eps_sdot) break;
@@ -1203,7 +1218,7 @@ int main()
 
         for (int i = 0; i < N_nodes-1; i++)
         {
-            if (rho_solid_new[i] >= 0.98 && alpha_eff[i+1] < 0.98)
+            if (alpha_eff[i] >= 0.98 && alpha_eff[i+1] < 0.98)
             {
                 double a1 = alpha_eff[i];
                 double a2 = alpha_eff[i+1];
@@ -1227,9 +1242,18 @@ int main()
                 double frac = (0.02 - a1) / (a2 - a1);
 
                 x_pyro_front = x[i] + frac * (x[i+1] - x[i]);
+
                 break;
             }
+
         }
+        
+        if (n==nstep)
+        {
+            cout<<x_pyro_front<<endl;
+        }
+        
+        
         fout3 << time << "," << x_char_front << "," << x_pyro_front << "\n";
 
         fout2 << time << "," << x[80] << "," << T_old[80] << "\n";  // mevcut satır
@@ -1262,7 +1286,7 @@ int main()
         //            resid_pct_s);
         // }
     }
-
+    
     fout.close();
     printf("\n%s\n", string(80, '=').c_str());
     printf("TAMAMLANDI\n");
